@@ -1,0 +1,40 @@
+# docker-compose.yml (versão final e corrigida)
+
+services:
+  db:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_DB=sistema_rh_db
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin123
+    ports:
+      - "5432:5432"
+    # --- NOVA SEÇÃO DE HEALTHCHECK ---
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d sistema_rh_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DB_NAME=sistema_rh_db
+      - DB_USER=admin
+      - DB_PASS=admin123
+      - DB_HOST=db
+      - DB_PORT=5432
+    # --- MUDANÇA NO depends_on ---
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
