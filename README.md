@@ -78,3 +78,6 @@ Com a base atual, o projeto pode evoluir para um sistema de gestão de call cent
 - **Hierarquia e Permissões:** Criar novos grupos de usuários (Supervisor, Analista de RH) com permissões específicas.
 - **Dashboards:** Criar uma visão para o supervisor monitorar o status de sua equipe (logado, em pausa, etc.).
 - **Mock de Dados:** Desenvolver um comando de gerenciamento para popular o banco de dados com dados fictícios para testes e simulações.
+
+
+oi

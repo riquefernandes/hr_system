@@ -1,0 +1,9 @@
+# Migrations
+*/migrations/*
+
+# Static files collected by Django
+staticfiles/
+
+# Python cache
+__pycache__/
+*.pyc

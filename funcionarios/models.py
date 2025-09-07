@@ -39,6 +39,7 @@ class Funcionario(models.Model):
     data_nascimento = models.DateField()
     sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
     
+    
     # Campos de Endereço Estruturado
     cep = models.CharField(max_length=9)
     rua = models.CharField(max_length=255)
@@ -47,6 +48,9 @@ class Funcionario(models.Model):
     cidade = models.CharField(max_length=100)
     estado = models.CharField(max_length=2)
     complemento = models.CharField(max_length=100, blank=True, null=True)
+ 
+    
+
     
     # Campos de Documentos
     cpf = BRCPFField(unique=True) 

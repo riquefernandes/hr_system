@@ -1,0 +1,3 @@
+Comandos importantes
+
+sudo docker compose logs -f web
