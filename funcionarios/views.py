@@ -2,10 +2,12 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from .forms import SolicitacaoAlteracaoEnderecoForm, SolicitacaoAlteracaoBancariaForm
+from .models import SolicitacaoAlteracaoEndereco, SolicitacaoAlteracaoBancaria
 
-# CORREÇÃO ESTÁ NESTA LINHA DE IMPORT:
-from .forms import SolicitacaoAlteracaoSimplesForm, SolicitacaoAlteracaoBancariaForm
-from .models import SolicitacaoAlteracaoSimples, SolicitacaoAlteracaoBancaria
+# Nossos formulários e modelos atualizados
+from .forms import SolicitacaoAlteracaoEnderecoForm, SolicitacaoAlteracaoBancariaForm
+from .models import SolicitacaoAlteracaoEndereco, SolicitacaoAlteracaoBancaria
 
 def login_view(request):
     if request.method == 'POST':
@@ -24,14 +26,16 @@ def login_view(request):
 def home_view(request):
     funcionario = request.user.funcionario
     
-    form_simples = SolicitacaoAlteracaoSimplesForm()
+    # Instancia os dois formulários
+    form_endereco = SolicitacaoAlteracaoEnderecoForm()
     form_bancario = SolicitacaoAlteracaoBancariaForm()
 
     if request.method == 'POST':
-        if 'submit_simples' in request.POST:
-            form_simples = SolicitacaoAlteracaoSimplesForm(request.POST)
-            if form_simples.is_valid():
-                solicitacao = form_simples.save(commit=False)
+        # Verifica qual formulário foi enviado pelo nome do botão
+        if 'submit_endereco' in request.POST:
+            form_endereco = SolicitacaoAlteracaoEnderecoForm(request.POST)
+            if form_endereco.is_valid():
+                solicitacao = form_endereco.save(commit=False)
                 solicitacao.funcionario = funcionario
                 solicitacao.save()
                 return redirect('funcionarios:home')
@@ -44,14 +48,15 @@ def home_view(request):
                 solicitacao.save()
                 return redirect('funcionarios:home')
 
-    solicitacoes_simples = SolicitacaoAlteracaoSimples.objects.filter(funcionario=funcionario).order_by('-data_solicitacao')
+    # Busca o histórico de ambas as solicitações
+    solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(funcionario=funcionario).order_by('-data_solicitacao')
     solicitacoes_bancarias = SolicitacaoAlteracaoBancaria.objects.filter(funcionario=funcionario).order_by('-data_solicitacao')
 
     context = {
         'funcionario_data': funcionario,
-        'form_simples': form_simples,
+        'form_endereco': form_endereco,
         'form_bancario': form_bancario,
-        'solicitacoes_simples': solicitacoes_simples,
+        'solicitacoes_endereco': solicitacoes_endereco,
         'solicitacoes_bancarias': solicitacoes_bancarias,
     }
     return render(request, 'funcionarios/home.html', context)

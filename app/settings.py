@@ -55,7 +55,7 @@ ROOT_URLCONF = 'app.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -127,3 +127,9 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 LOGIN_URL = 'funcionarios:login'
+
+# URL para acessar os arquivos estáticos no navegador
+STATIC_URL = 'static/'
+
+# Caminho da pasta no servidor onde o collectstatic vai juntar todos os arquivos estáticos
+STATIC_ROOT = BASE_DIR / 'staticfiles'

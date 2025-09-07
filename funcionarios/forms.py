@@ -1,16 +1,24 @@
 # funcionarios/forms.py
 from django import forms
-from .models import SolicitacaoAlteracaoSimples, SolicitacaoAlteracaoBancaria
+# Atualizamos a importação para os modelos corretos
+from .models import SolicitacaoAlteracaoEndereco, SolicitacaoAlteracaoBancaria
 
-class SolicitacaoAlteracaoSimplesForm(forms.ModelForm):
+# Este é o nosso novo formulário para endereço
+class SolicitacaoAlteracaoEnderecoForm(forms.ModelForm):
     class Meta:
-        model = SolicitacaoAlteracaoSimples
-        fields = ['campo', 'novo_valor']
+        model = SolicitacaoAlteracaoEndereco
+        fields = ['cep', 'rua', 'numero', 'bairro', 'cidade', 'estado', 'complemento']
         labels = {
-            'campo': 'O que você quer alterar?',
-            'novo_valor': 'Qual o novo valor?',
+            'cep': 'CEP',
+            'rua': 'Rua / Logradouro',
+            'numero': 'Número',
+            'bairro': 'Bairro',
+            'cidade': 'Cidade',
+            'estado': 'Estado (UF)',
+            'complemento': 'Complemento (Opcional)',
         }
 
+# O formulário bancário continua o mesmo
 class SolicitacaoAlteracaoBancariaForm(forms.ModelForm):
     class Meta:
         model = SolicitacaoAlteracaoBancaria

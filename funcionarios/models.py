@@ -1,4 +1,4 @@
-# funcionarios/models.py
+# funcionarios/models.py (VERSÃO COMPLETA E FINAL)
 from django.db import models
 from django.contrib.auth.models import User
 from localflavor.br.models import BRCPFField
@@ -37,14 +37,16 @@ class Funcionario(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     nome_completo = models.CharField(max_length=255)
     data_nascimento = models.DateField()
-    cep = models.CharField(max_length=9) # Ex: 01001-000
+    sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
+    
+    # Campos de Endereço Estruturado
+    cep = models.CharField(max_length=9)
     rua = models.CharField(max_length=255)
     numero = models.CharField(max_length=20)
     bairro = models.CharField(max_length=100)
     cidade = models.CharField(max_length=100)
-    estado = models.CharField(max_length=2) # Ex: SP
+    estado = models.CharField(max_length=2)
     complemento = models.CharField(max_length=100, blank=True, null=True)
-    sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
     
     # Campos de Documentos
     cpf = BRCPFField(unique=True) 
@@ -62,27 +64,25 @@ class Funcionario(models.Model):
     def __str__(self):
         return self.nome_completo
 
-# --- Modelo de Solicitações ---
+# --- Modelos de Solicitações ---
 
-class SolicitacaoAlteracaoSimples(models.Model):
-    STATUS_CHOICES = [
-        ('P', 'Pendente'),
-        ('A', 'Aprovado'),
-        ('R', 'Recusado'),
-    ]
-    CAMPO_CHOICES = [
-        ('endereco_residencial', 'Endereço Residencial'),
-    ]
+class SolicitacaoAlteracaoEndereco(models.Model):
+    STATUS_CHOICES = [('P', 'Pendente'), ('A', 'Aprovado'), ('R', 'Recusado')]
 
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
-    campo = models.CharField(max_length=50, choices=CAMPO_CHOICES)
-    novo_valor = models.TextField()
+    cep = models.CharField(max_length=9)
+    rua = models.CharField(max_length=255)
+    numero = models.CharField(max_length=20)
+    bairro = models.CharField(max_length=100)
+    cidade = models.CharField(max_length=100)
+    estado = models.CharField(max_length=2)
+    complemento = models.CharField(max_length=100, blank=True, null=True)
     status = models.CharField(max_length=1, choices=STATUS_CHOICES, default='P')
     data_solicitacao = models.DateTimeField(auto_now_add=True)
     data_aprovacao = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
-        return f'Solicitação Simples de {self.funcionario.nome_completo}'
+        return f'Solicitação de Endereço de {self.funcionario.nome_completo}'
     
 class SolicitacaoAlteracaoBancaria(models.Model):
     STATUS_CHOICES = [('P', 'Pendente'), ('A', 'Aprovado'), ('R', 'Recusado')]

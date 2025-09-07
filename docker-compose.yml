@@ -11,7 +11,6 @@ services:
       - POSTGRES_PASSWORD=admin123
     ports:
       - "5432:5432"
-    # --- NOVA SEÇÃO DE HEALTHCHECK ---
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d sistema_rh_db"]
       interval: 5s
@@ -26,12 +25,12 @@ services:
     ports:
       - "8000:8000"
     environment:
+      - TZ=America/Sao_Paulo
       - DB_NAME=sistema_rh_db
       - DB_USER=admin
       - DB_PASS=admin123
       - DB_HOST=db
       - DB_PORT=5432
-    # --- MUDANÇA NO depends_on ---
     depends_on:
       db:
         condition: service_healthy

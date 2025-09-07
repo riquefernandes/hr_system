@@ -1,87 +1,26 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Minha Página</title>
-</head>
-<body>
+{% extends 'funcionarios/base.html' %}
 
-    <h1>Seus Dados Cadastrais</h1>
+{% block title %}Página Inicial - {{ funcionario_data.nome_completo }}{% endblock %}
+
+{% block content %}
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h2">Seus Dados Cadastrais</h1>
+        <a href="{% url 'funcionarios:logout' %}" class="btn btn-danger">Sair do Sistema</a>
+    </div>
 
     <p><strong>Nome Completo:</strong> {{ funcionario_data.nome_completo }}</p>
     <p><strong>Matrícula:</strong> {{ funcionario_data.user.username }}</p>
-    <p><strong>Email:</strong> {{ funcionario_data.user.email }}</p>
-    <p><strong>Data de Nascimento:</strong> {{ funcionario_data.data_nascimento }}</p>
-    <p><strong>Endereço:</strong> {{ funcionario_data.endereco_residencial }}</p>
-    <p><strong>Sexo:</strong> {{ funcionario_data.get_sexo_display }}</p>
-    <p><strong>CPF:</strong> {{ funcionario_data.cpf }}</p>
-    <p><strong>RG:</strong> {{ funcionario_data.rg }}</p>
-    
-    <hr>
-    
-    <h2>Dados de Trabalho</h2>
-    <p><strong>Cargo:</strong> {{ funcionario_data.cargo.nome }}</p>
-    <p><strong>Centro de Custo:</strong> {{ funcionario_data.centro_de_custo.nome }}</p>
-
-    <hr>
-
-    <h2>Dados Bancários</h2>
-    <p><strong>Banco:</strong> {{ funcionario_data.banco.nome }}</p>
-    <p><strong>Agência:</strong> {{ funcionario_data.agencia }}</p>
-    <p><strong>Conta:</strong> {{ funcionario_data.conta }}</p>
-
+    ...
     <hr>
 
     <h2>Solicitar Alteração de Endereço</h2>
     <form method="post">
         {% csrf_token %}
-        {{ form_simples.as_p }}
-        <button type="submit" name="submit_simples">Enviar Solicitação de Endereço</button>
+        {{ form_endereco.as_p }}
+        <button type="submit" name="submit_endereco" class="btn btn-primary">Enviar Solicitação de Endereço</button>
     </form>
 
     <hr>
-
-    <h2>Solicitar Alteração de Dados Bancários</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form_bancario.as_p }}
-        <button type="submit" name="submit_bancario">Enviar Solicitação Bancária</button>
-    </form>
-
-    <hr>
-
-    <h2>Suas Solicitações</h2>
-    <h4>Alterações de Endereço</h4>
-    {% if solicitacoes_simples %}
-        <ul>
-            {% for s in solicitacoes_simples %}
-            <li>
-                {{ s.data_solicitacao|date:"d/m/Y" }}: Alterar "{{ s.get_campo_display }}" para "{{ s.novo_valor }}" 
-                - <strong>Status: {{ s.get_status_display }}</strong>
-            </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>Você ainda não fez nenhuma solicitação de endereço.</p>
-    {% endif %}
-
-    <h4>Alterações Bancárias</h4>
-    {% if solicitacoes_bancarias %}
-         <ul>
-            {% for s in solicitacoes_bancarias %}
-            <li>
-                {{ s.data_solicitacao|date:"d/m/Y" }}: Alterar para Banco {{s.banco}}, Agência {{s.agencia}}, Conta {{s.conta}}
-                - <strong>Status: {{ s.get_status_display }}</strong>
-            </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>Você ainda não fez nenhuma solicitação bancária.</p>
-    {% endif %}
-
-    <hr>
-
-    <a href="{% url 'funcionarios:logout' %}">Sair do Sistema</a>
-
-</body>
-</html>
+    
+    {% endblock %}
