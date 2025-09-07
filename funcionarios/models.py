@@ -37,7 +37,13 @@ class Funcionario(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     nome_completo = models.CharField(max_length=255)
     data_nascimento = models.DateField()
-    endereco_residencial = models.TextField()
+    cep = models.CharField(max_length=9) # Ex: 01001-000
+    rua = models.CharField(max_length=255)
+    numero = models.CharField(max_length=20)
+    bairro = models.CharField(max_length=100)
+    cidade = models.CharField(max_length=100)
+    estado = models.CharField(max_length=2) # Ex: SP
+    complemento = models.CharField(max_length=100, blank=True, null=True)
     sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
     
     # Campos de Documentos
