@@ -31,13 +31,6 @@ class Banco(models.Model):
 
 
 class Funcionario(models.Model):
-    SEXO_CHOICES = [
-        ("M", "Masculino"),
-        ("F", "Feminino"),
-        ("O", "Outro"),
-        ("N", "Prefiro não dizer"),
-    ]
-
     ESCOLARIDADE_CHOICES = [
         ("EF", "Ensino Fundamental"),
         ("EM", "Ensino Médio"),
@@ -50,6 +43,12 @@ class Funcionario(models.Model):
         ("FERIAS", "Férias"),
         ("AFASTADO", "Afastado"),
         ("DESLIGADO", "Desligado"),
+    ]
+    SEXO_CHOICES = [
+        ("M", "Masculino"),
+        ("F", "Feminino"),
+        ("O", "Outro"),
+        ("N", "Prefiro não dizer"),
     ]
 
     # Campos de Login e Pessoais
@@ -65,12 +64,10 @@ class Funcionario(models.Model):
     escolaridade = models.CharField(
         max_length=2, choices=ESCOLARIDADE_CHOICES, blank=True, null=True
     )
-
-    # --- NOVOS CAMPOS DE CONTATO DE EMERGÊNCIA ---
     contato_emergencia_nome = models.CharField(max_length=255, blank=True, null=True)
     contato_emergencia_telefone = models.CharField(max_length=20, blank=True, null=True)
 
-    # --- NOVOS CAMPOS DE TRABALHO ---
+    # Campos de Contrato
     data_contratacao = models.DateField()
     data_demissao = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ATIVO")
@@ -93,6 +90,14 @@ class Funcionario(models.Model):
     centro_de_custo = models.ForeignKey(
         CentroDeCusto, on_delete=models.SET_NULL, null=True, blank=True
     )
+    supervisor = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="equipe",
+        help_text="O supervisor direto deste funcionário.",
+    )
 
     # Campos Bancários
     banco = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True, blank=True)
@@ -104,11 +109,9 @@ class Funcionario(models.Model):
 
 
 # --- Modelos de Solicitações ---
-
-
 class SolicitacaoAlteracaoEndereco(models.Model):
+    # ... (código sem alterações)
     STATUS_CHOICES = [("P", "Pendente"), ("A", "Aprovado"), ("R", "Recusado")]
-
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
     cep = models.CharField(max_length=9)
     rua = models.CharField(max_length=255)
@@ -126,8 +129,8 @@ class SolicitacaoAlteracaoEndereco(models.Model):
 
 
 class SolicitacaoAlteracaoBancaria(models.Model):
+    # ... (código sem alterações)
     STATUS_CHOICES = [("P", "Pendente"), ("A", "Aprovado"), ("R", "Recusado")]
-
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
     banco = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True)
     agencia = models.CharField(max_length=10)

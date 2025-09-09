@@ -57,7 +57,7 @@ class FuncionarioAdmin(admin.ModelAdmin):
                 )
             },
         ),
-        ("Dados de Trabalho", {"fields": ("cargo", "centro_de_custo")}),
+        ("Dados de Trabalho", {"fields": ("cargo", "centro_de_custo", "supervisor")}),
         ("Dados Bancários", {"fields": ("banco", "agencia", "conta")}),
     )
 

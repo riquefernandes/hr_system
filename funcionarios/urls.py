@@ -25,4 +25,9 @@ urlpatterns = [
         ),
         name="password_change_done",
     ),
+    path(
+        "supervisor/dashboard/",
+        views.supervisor_dashboard_view,
+        name="supervisor_dashboard",
+    ),
 ]

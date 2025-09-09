@@ -40,6 +40,26 @@ class CustomPasswordChangeView(PasswordChangeView):
         return super().form_valid(form)
 
 
+def supervisor_dashboard_view(request):
+    # Primeiro, verificamos se o usuário tem a permissão para ver a página
+    # Ou se é um superusuário (que pode tudo)
+    if (
+        not request.user.has_perm("funcionarios.view_funcionario")
+        and not request.user.is_superuser
+    ):
+        # Redireciona para a home normal se não tiver permissão
+        return redirect("funcionarios:home")
+
+    # Pega o objeto do supervisor logado
+    supervisor_logado = request.user.funcionario
+
+    # Usa o 'related_name' que criamos para pegar a equipe dele!
+    equipe_do_supervisor = supervisor_logado.equipe.all()
+
+    context = {"supervisor": supervisor_logado, "equipe": equipe_do_supervisor}
+    return render(request, "funcionarios/supervisor_dashboard.html", context)
+
+
 @login_required
 def home_view(request):
     # ... (esta função não muda)
