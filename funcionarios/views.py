@@ -1,18 +1,25 @@
-# funcionarios/views.py (VERSÃO FINAL COM TROCA DE SENHA)
+# funcionarios/views.py
 from django.shortcuts import render, redirect
+from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-
-# Importa a view de troca de senha original do Django
 from django.contrib.auth.views import PasswordChangeView
+from django.views.decorators.http import require_POST
+
+# Novas importações para trabalhar com data e hora
+from django.utils import timezone
+from datetime import timedelta
 
 from .forms import SolicitacaoAlteracaoEnderecoForm, SolicitacaoAlteracaoBancariaForm
-from .models import SolicitacaoAlteracaoEndereco, SolicitacaoAlteracaoBancaria
+from .models import (
+    SolicitacaoAlteracaoEndereco,
+    SolicitacaoAlteracaoBancaria,
+    RegistroPonto,
+    Funcionario,  # Adicionado para a lógica
+)
 
 
 def login_view(request):
-    # ... (esta função não muda)
     if request.method == "POST":
         matricula = request.POST.get("username")
         senha = request.POST.get("password")
@@ -27,33 +34,23 @@ def login_view(request):
         return render(request, "funcionarios/login.html")
 
 
-# --- NOSSA NOVA VIEW CUSTOMIZADA ---
 class CustomPasswordChangeView(PasswordChangeView):
-    # Sobrescreve o método que é chamado quando o formulário é válido
     def form_valid(self, form):
-        # Pega o funcionário logado
         funcionario = self.request.user.funcionario
-        # Abaixa a bandeira
         funcionario.deve_alterar_senha = False
         funcionario.save()
-        # Continua o processo normal da view original
         return super().form_valid(form)
 
 
+@login_required
 def supervisor_dashboard_view(request):
-    # Primeiro, verificamos se o usuário tem a permissão para ver a página
-    # Ou se é um superusuário (que pode tudo)
     if (
         not request.user.has_perm("funcionarios.view_funcionario")
         and not request.user.is_superuser
     ):
-        # Redireciona para a home normal se não tiver permissão
         return redirect("funcionarios:home")
 
-    # Pega o objeto do supervisor logado
     supervisor_logado = request.user.funcionario
-
-    # Usa o 'related_name' que criamos para pegar a equipe dele!
     equipe_do_supervisor = supervisor_logado.equipe.all()
 
     context = {"supervisor": supervisor_logado, "equipe": equipe_do_supervisor}
@@ -62,7 +59,6 @@ def supervisor_dashboard_view(request):
 
 @login_required
 def home_view(request):
-    # ... (esta função não muda)
     funcionario = request.user.funcionario
     form_endereco = SolicitacaoAlteracaoEnderecoForm()
     form_bancario = SolicitacaoAlteracaoBancariaForm()
@@ -91,6 +87,17 @@ def home_view(request):
                 )
                 return redirect("funcionarios:home")
 
+    # --- LÓGICA PARA EXIBIR STATUS DAS PAUSAS ---
+    hoje = timezone.now().date()
+    pausas_hoje_count = 0
+    regras_cargo = funcionario.cargo
+
+    if regras_cargo:
+        pausas_hoje_count = RegistroPonto.objects.filter(
+            funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__date=hoje
+        ).count()
+    # --- FIM DA LÓGICA DE PAUSAS ---
+
     solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(
         funcionario=funcionario
     ).order_by("-data_solicitacao")
@@ -104,11 +111,75 @@ def home_view(request):
         "form_bancario": form_bancario,
         "solicitacoes_endereco": solicitacoes_endereco,
         "solicitacoes_bancarias": solicitacoes_bancarias,
+        "pausas_hoje_count": pausas_hoje_count,
+        "regras_cargo": regras_cargo,
     }
     return render(request, "funcionarios/home.html", context)
 
 
+@login_required
+@require_POST
+def bate_ponto_view(request):
+    funcionario = request.user.funcionario
+    tipo_ponto = request.POST.get("tipo_ponto")
+
+    if not tipo_ponto:
+        messages.error(request, "Você precisa selecionar um tipo de registro.")
+        return redirect("funcionarios:home")
+
+    if tipo_ponto == "SAIDA_PAUSA":
+        regras_cargo = funcionario.cargo
+        hoje = timezone.now().date()
+
+        if not regras_cargo:
+            messages.error(
+                request,
+                "Não foi possível verificar as regras de pausa (cargo não definido).",
+            )
+            return redirect("funcionarios:home")
+
+        pausas_hoje = RegistroPonto.objects.filter(
+            funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__date=hoje
+        ).count()
+
+        if pausas_hoje >= regras_cargo.max_pausas_diarias:
+            messages.error(
+                request,
+                f"Você já atingiu o limite de {regras_cargo.max_pausas_diarias} pausas por dia.",
+            )
+            return redirect("funcionarios:home")
+
+        registros_pausa_hoje = RegistroPonto.objects.filter(
+            funcionario=funcionario,
+            tipo__in=["SAIDA_PAUSA", "VOLTA_PAUSA"],
+            timestamp__date=hoje,
+        ).order_by("timestamp")
+
+        duracao_total_pausas = timedelta()
+        ultimo_inicio_pausa = None
+
+        for registro in registros_pausa_hoje:
+            if registro.tipo == "SAIDA_PAUSA":
+                ultimo_inicio_pausa = registro.timestamp
+            elif registro.tipo == "VOLTA_PAUSA" and ultimo_inicio_pausa:
+                duracao_total_pausas += registro.timestamp - ultimo_inicio_pausa
+                ultimo_inicio_pausa = None
+
+        if (
+            duracao_total_pausas.total_seconds() / 60
+            >= regras_cargo.duracao_max_pausas_minutos
+        ):
+            messages.error(
+                request,
+                f"Você já atingiu o tempo limite de {regras_cargo.duracao_max_pausas_minutos} minutos em pausas hoje.",
+            )
+            return redirect("funcionarios:home")
+
+    RegistroPonto.objects.create(funcionario=funcionario, tipo=tipo_ponto)
+    messages.success(request, "Ponto registrado com sucesso!")
+    return redirect("funcionarios:home")
+
+
 def logout_view(request):
-    # ... (esta função não muda)
     logout(request)
     return redirect("funcionarios:login")

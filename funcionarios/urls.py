@@ -25,6 +25,7 @@ urlpatterns = [
         ),
         name="password_change_done",
     ),
+    path("bate-ponto/", views.bate_ponto_view, name="bate_ponto"),
     path(
         "supervisor/dashboard/",
         views.supervisor_dashboard_view,
