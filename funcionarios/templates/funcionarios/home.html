@@ -1,52 +1,38 @@
-{% extends 'funcionarios/base.html' %} {% block title %}Página Inicial - {{
-funcionario_data.nome_completo }}{% endblock %} {% block content %}
+{% extends 'funcionarios/base.html' %} 
 
+{% block title %}Página Inicial - {{ funcionario_data.nome_completo }}{% endblock %} 
+
+{% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h2">Seus Dados Cadastrais</h1>
-    <a href="{% url 'funcionarios:logout' %}" class="btn btn-danger btn-sm"
-        >Sair do Sistema</a
-    >
+    <a href="{% url 'funcionarios:logout' %}" class="btn btn-danger btn-sm">Sair do Sistema</a>
 </div>
 
 <div class="card mb-4">
-    <div class="card-header">Informações Pessoais e Documentos</div>
+    <div class="card-header">
+        Informações Pessoais e Documentos
+    </div>
     <div class="card-body">
-        <p>
-            <strong>Nome Completo:</strong> {{ funcionario_data.nome_completo }}
-        </p>
+        <p><strong>Nome Completo:</strong> {{ funcionario_data.nome_completo }}</p>
         <p><strong>Matrícula:</strong> {{ funcionario_data.user.username }}</p>
         <p><strong>Email:</strong> {{ funcionario_data.user.email }}</p>
-        <p>
-            <strong>Data de Nascimento:</strong> {{
-            funcionario_data.data_nascimento|date:"d/m/Y" }}
-        </p>
+        <p><strong>Data de Nascimento:</strong> {{ funcionario_data.data_nascimento | date:"d/m/Y" }}</p>
         <p><strong>Sexo:</strong> {{ funcionario_data.get_sexo_display }}</p>
         <p><strong>CPF:</strong> {{ funcionario_data.cpf }}</p>
         <p><strong>RG:</strong> {{ funcionario_data.rg }}</p>
-        <p>
-            <strong>Carteira de Trabalho (CTPS):</strong> {{
-            funcionario_data.ctps|default:"Não informado" }}
-        </p>
     </div>
 </div>
 
 <div class="card mb-4">
-    <div class="card-header">Endereço</div>
+    <div class="card-header">
+        Endereço
+    </div>
     <div class="card-body">
         <p><strong>CEP:</strong> {{ funcionario_data.cep }}</p>
-        <p>
-            <strong>Rua:</strong> {{ funcionario_data.rua }}, Nº {{
-            funcionario_data.numero }}
-        </p>
-        <p>
-            <strong>Complemento:</strong> {{
-            funcionario_data.complemento|default:"N/A" }}
-        </p>
+        <p><strong>Rua:</strong> {{ funcionario_data.rua }}, Nº {{ funcionario_data.numero }}</p>
+        <p><strong>Complemento:</strong> {{ funcionario_data.complemento|default:"N/A" }}</p>
         <p><strong>Bairro:</strong> {{ funcionario_data.bairro }}</p>
-        <p>
-            <strong>Cidade/Estado:</strong> {{ funcionario_data.cidade }} / {{
-            funcionario_data.estado }}
-        </p>
+        <p><strong>Cidade/Estado:</strong> {{ funcionario_data.cidade }} / {{ funcionario_data.estado }}</p>
     </div>
 </div>
 
@@ -55,15 +41,8 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
         <div class="card mb-4">
             <div class="card-header">Dados de Trabalho</div>
             <div class="card-body">
-                <p>
-                    <strong>Cargo:</strong> {{
-                    funcionario_data.cargo.nome|default:"Não informado" }}
-                </p>
-                <p>
-                    <strong>Centro de Custo:</strong> {{
-                    funcionario_data.centro_de_custo.nome|default:"Não
-                    informado" }}
-                </p>
+                <p><strong>Cargo:</strong> {{ funcionario_data.cargo.nome|default:"Não informado" }}</p>
+                <p><strong>Centro de Custo:</strong> {{ funcionario_data.centro_de_custo.nome|default:"Não informado" }}</p>
             </div>
         </div>
     </div>
@@ -71,18 +50,9 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
         <div class="card mb-4">
             <div class="card-header">Dados Bancários</div>
             <div class="card-body">
-                <p>
-                    <strong>Banco:</strong> {{
-                    funcionario_data.banco.nome|default:"Não informado" }}
-                </p>
-                <p>
-                    <strong>Agência:</strong> {{
-                    funcionario_data.agencia|default:"Não informado" }}
-                </p>
-                <p>
-                    <strong>Conta:</strong> {{
-                    funcionario_data.conta|default:"Não informado" }}
-                </p>
+                <p><strong>Banco:</strong> {{ funcionario_data.banco.nome|default:"Não informado" }}</p>
+                <p><strong>Agência:</strong> {{ funcionario_data.agencia|default:"Não informado" }}</p>
+                <p><strong>Conta:</strong> {{ funcionario_data.conta|default:"Não informado" }}</p>
             </div>
         </div>
     </div>
@@ -96,12 +66,9 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
             <div class="card-header">Solicitar Alteração de Endereço</div>
             <div class="card-body">
                 <form method="post">
-                    {% csrf_token %} {{ form_endereco.as_p }}
-                    <button
-                        type="submit"
-                        name="submit_endereco"
-                        class="btn btn-primary"
-                    >
+                    {% csrf_token %} 
+                    {{ form_endereco.as_p }}
+                    <button type="submit" name="submit_endereco" class="btn btn-primary">
                         Enviar Solicitação de Endereço
                     </button>
                 </form>
@@ -110,17 +77,12 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
     </div>
     <div class="col-md-6">
         <div class="card mb-4">
-            <div class="card-header">
-                Solicitar Alteração de Dados Bancários
-            </div>
+            <div class="card-header">Solicitar Alteração de Dados Bancários</div>
             <div class="card-body">
                 <form method="post">
-                    {% csrf_token %} {{ form_bancario.as_p }}
-                    <button
-                        type="submit"
-                        name="submit_bancario"
-                        class="btn btn-primary"
-                    >
+                    {% csrf_token %} 
+                    {{ form_bancario.as_p }}
+                    <button type="submit" name="submit_bancario" class="btn btn-primary">
                         Enviar Solicitação Bancária
                     </button>
                 </form>
@@ -139,8 +101,7 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
         <ul class="list-group">
             {% for s in solicitacoes_endereco %}
             <li class="list-group-item">
-                {{ s.data_solicitacao|date:"d/m/Y" }}: Solicitação para CEP
-                {{s.cep}} -
+                {{ s.data_solicitacao|date:"d/m/Y" }}: Solicitação para CEP {{s.cep}} -
                 <span class="fw-bold">Status: {{ s.get_status_display }}</span>
             </li>
             {% endfor %}
@@ -155,8 +116,7 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
         <ul class="list-group">
             {% for s in solicitacoes_bancarias %}
             <li class="list-group-item">
-                {{ s.data_solicitacao|date:"d/m/Y" }}: Alterar para Banco
-                {{s.banco}}, Ag. {{s.agencia}}, Conta {{s.conta}} -
+                {{ s.data_solicitacao|date:"d/m/Y" }}: Alterar para Banco {{s.banco}}, Ag. {{s.agencia}}, Conta {{s.conta}} -
                 <span class="fw-bold">Status: {{ s.get_status_display }}</span>
             </li>
             {% endfor %}
@@ -166,6 +126,8 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
         {% endif %}
     </div>
 </div>
+
+<hr />
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
@@ -178,24 +140,19 @@ funcionario_data.nome_completo }}{% endblock %} {% block content %}
                         .then((response) => response.json())
                         .then((data) => {
                             if (!data.erro) {
-                                document.getElementById('id_rua').value =
-                                    data.logradouro;
-                                document.getElementById('id_bairro').value =
-                                    data.bairro;
-                                document.getElementById('id_cidade').value =
-                                    data.localidade;
-                                document.getElementById('id_estado').value =
-                                    data.uf;
+                                document.getElementById('id_rua').value = data.logradouro;
+                                document.getElementById('id_bairro').value = data.bairro;
+                                document.getElementById('id_cidade').value = data.localidade;
+                                document.getElementById('id_estado').value = data.uf;
                             } else {
                                 alert('CEP não encontrado.');
                             }
                         })
-                        .catch((error) =>
-                            console.error('Erro ao buscar CEP:', error)
-                        );
+                        .catch((error) => console.error('Erro ao buscar CEP:', error));
                 }
             });
         }
     });
 </script>
+
 {% endblock %}
