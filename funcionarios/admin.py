@@ -1,4 +1,4 @@
-# funcionarios/admin.py (VERSÃO FINAL E CORRIGIDA)
+# funcionarios/admin.py
 from django.contrib import admin
 from .models import (
     Cargo,
@@ -18,7 +18,6 @@ class FuncionarioAdmin(admin.ModelAdmin):
         "matricula_usuario",
     )
 
-    # fieldsets é uma tupla, onde cada item interno é outra tupla de (Título, {opções})
     fieldsets = (
         (
             "Informações de Login",
@@ -65,6 +64,14 @@ class FuncionarioAdmin(admin.ModelAdmin):
     list_filter = ("status", "cargo", "centro_de_custo", "banco")
     search_fields = ("nome_completo", "cpf", "user__username")
 
+    # --- MÉTODO ADICIONADO PARA FILTRAR O DROPDOWN ---
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "supervisor":
+            kwargs["queryset"] = Funcionario.objects.filter(
+                cargo__nome="Supervisor de Equipe"
+            )
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
     @admin.display(description="Email (do login)")
     def email_usuario(self, obj):
         if obj.user:
@@ -77,7 +84,6 @@ class FuncionarioAdmin(admin.ModelAdmin):
             return obj.user.username
         return "Será gerada ao salvar"
 
-    # A class Media precisa estar indentada DENTRO da FuncionarioAdmin
     class Media:
         js = ("funcionarios/js/cep_lookup.js",)
 
@@ -87,7 +93,15 @@ class FuncionarioAdmin(admin.ModelAdmin):
 def aprovar_solicitacoes_endereco(modeladmin, request, queryset):
     for solicitacao in queryset:
         f = solicitacao.funcionario
-        f.cep, f.rua, f.numero, f.bairro, f.cidade, f.estado, f.complemento = (
+        (
+            f.cep,
+            f.rua,
+            f.numero,
+            f.bairro,
+            f.cidade,
+            f.estado,
+            f.complemento,
+        ) = (
             solicitacao.cep,
             solicitacao.rua,
             solicitacao.numero,
