@@ -2,6 +2,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
 
 # Importa a view de troca de senha original do Django
 from django.contrib.auth.views import PasswordChangeView
@@ -20,6 +21,7 @@ def login_view(request):
             login(request, user)
             return redirect("funcionarios:home")
         else:
+            messages.error(request, "Matrícula ou senha incorreta. Tente novamente.")
             return render(request, "funcionarios/login.html")
     else:
         return render(request, "funcionarios/login.html")
