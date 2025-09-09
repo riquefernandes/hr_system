@@ -54,6 +54,10 @@ def home_view(request):
                 solicitacao = form_endereco.save(commit=False)
                 solicitacao.funcionario = funcionario
                 solicitacao.save()
+                messages.success(
+                    request,
+                    "Sua solicitação de alteração de endereço foi enviada para aprovação!",
+                )
                 return redirect("funcionarios:home")
         elif "submit_bancario" in request.POST:
             form_bancario = SolicitacaoAlteracaoBancariaForm(request.POST)
@@ -61,6 +65,10 @@ def home_view(request):
                 solicitacao = form_bancario.save(commit=False)
                 solicitacao.funcionario = funcionario
                 solicitacao.save()
+                messages.success(
+                    request,
+                    "Sua solicitação de alteração bancária foi enviada para aprovação!",
+                )
                 return redirect("funcionarios:home")
 
     solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(
