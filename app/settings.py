@@ -142,3 +142,5 @@ MESSAGE_TAGS = {
     messages.ERROR: "danger",
     messages.SUCCESS: "success",  # <-- ADICIONE ESTA LINHA
 }
+
+ALLOWED_HOSTS = ["*"]

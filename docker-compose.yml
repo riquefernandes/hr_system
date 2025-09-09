@@ -24,6 +24,7 @@ services:
       - .:/app
     ports:
       - "8000:8000"
+      - "8089:8089" # <-- ADICIONE ESTA LINHA
     environment:
       - TZ=America/Sao_Paulo
       - DB_NAME=sistema_rh_db
