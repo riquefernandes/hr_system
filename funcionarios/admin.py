@@ -13,20 +13,35 @@ from django.utils import timezone
 
 # --- CLASSE DE ADMIN PARA FUNCIONARIO ---
 class FuncionarioAdmin(admin.ModelAdmin):
-    readonly_fields = ("email_usuario", "matricula_usuario")
+    readonly_fields = (
+        "email_usuario",
+        "matricula_usuario",
+    )
+
+    # fieldsets é uma tupla, onde cada item interno é outra tupla de (Título, {opções})
     fieldsets = (
+        (
+            "Informações de Login",
+            {"fields": ("matricula_usuario", "email_usuario", "status")},
+        ),
         (
             "Informações Pessoais",
             {
                 "fields": (
-                    "matricula_usuario",
                     "nome_completo",
                     "data_nascimento",
                     "sexo",
-                    "email_usuario",
+                    "email_pessoal",
+                    "telefone_celular",
+                    "escolaridade",
                 )
             },
         ),
+        (
+            "Contato de Emergência",
+            {"fields": ("contato_emergencia_nome", "contato_emergencia_telefone")},
+        ),
+        ("Datas de Contrato", {"fields": ("data_contratacao", "data_demissao")}),
         ("Documentos", {"fields": ("cpf", "rg")}),
         (
             "Endereço",
@@ -45,12 +60,10 @@ class FuncionarioAdmin(admin.ModelAdmin):
         ("Dados de Trabalho", {"fields": ("cargo", "centro_de_custo")}),
         ("Dados Bancários", {"fields": ("banco", "agencia", "conta")}),
     )
-    list_display = ("nome_completo", "matricula_usuario", "cpf", "cargo")
-    list_filter = ("cargo", "centro_de_custo", "banco")
-    search_fields = ("nome_completo", "cpf")
-    # --- CORREÇÃO NESTA LINHA ---
-    list_filter = ("cargo", "centro_de_custo", "banco")
-    search_fields = ("nome_completo", "cpf")
+
+    list_display = ("nome_completo", "matricula_usuario", "cpf", "cargo", "status")
+    list_filter = ("status", "cargo", "centro_de_custo", "banco")
+    search_fields = ("nome_completo", "cpf", "user__username")
 
     @admin.display(description="Email (do login)")
     def email_usuario(self, obj):
@@ -64,9 +77,9 @@ class FuncionarioAdmin(admin.ModelAdmin):
             return obj.user.username
         return "Será gerada ao salvar"
 
-
-class Media:
-    js = ("funcionarios/js/cep_lookup.js",)
+    # A class Media precisa estar indentada DENTRO da FuncionarioAdmin
+    class Media:
+        js = ("funcionarios/js/cep_lookup.js",)
 
 
 # --- Ações Customizadas ---
@@ -120,10 +133,3 @@ admin.site.register(Banco)
 admin.site.register(Funcionario, FuncionarioAdmin)
 admin.site.register(SolicitacaoAlteracaoEndereco, SolicitacaoAlteracaoEnderecoAdmin)
 admin.site.register(SolicitacaoAlteracaoBancaria, SolicitacaoAlteracaoBancariaAdmin)
-
-
-@admin.display(description="Email (do login)")
-def email_usuario(self, obj):
-    if obj.user:
-        return obj.user.email
-    return "Será gerado ao salvar"

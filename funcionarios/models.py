@@ -38,12 +38,42 @@ class Funcionario(models.Model):
         ("N", "Prefiro não dizer"),
     ]
 
+    ESCOLARIDADE_CHOICES = [
+        ("EF", "Ensino Fundamental"),
+        ("EM", "Ensino Médio"),
+        ("SI", "Superior Incompleto"),
+        ("SC", "Superior Completo"),
+        ("PG", "Pós-Graduação"),
+    ]
+    STATUS_CHOICES = [
+        ("ATIVO", "Ativo"),
+        ("FERIAS", "Férias"),
+        ("AFASTADO", "Afastado"),
+        ("DESLIGADO", "Desligado"),
+    ]
+
     # Campos de Login e Pessoais
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True)
     nome_completo = models.CharField(max_length=255)
     deve_alterar_senha = models.BooleanField(default=True)
     data_nascimento = models.DateField()
     sexo = models.CharField(max_length=1, choices=SEXO_CHOICES)
+    telefone_celular = models.CharField(max_length=20, blank=True, null=True)
+    email_pessoal = models.EmailField(
+        max_length=255, unique=True, blank=True, null=True
+    )
+    escolaridade = models.CharField(
+        max_length=2, choices=ESCOLARIDADE_CHOICES, blank=True, null=True
+    )
+
+    # --- NOVOS CAMPOS DE CONTATO DE EMERGÊNCIA ---
+    contato_emergencia_nome = models.CharField(max_length=255, blank=True, null=True)
+    contato_emergencia_telefone = models.CharField(max_length=20, blank=True, null=True)
+
+    # --- NOVOS CAMPOS DE TRABALHO ---
+    data_contratacao = models.DateField()
+    data_demissao = models.DateField(blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ATIVO")
 
     # Campos de Endereço Estruturado
     cep = models.CharField(max_length=9)
