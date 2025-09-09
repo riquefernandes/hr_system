@@ -1,3 +1,7 @@
 Comandos importantes
 
 sudo docker compose logs -f web
+
+
+sudo docker compose exec web python manage.py makemigrations funcionarios
+sudo docker compose exec web python manage.py migrate
