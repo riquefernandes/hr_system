@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordChangeView
 from django.views.decorators.http import require_POST
 
-# Novas importações para trabalhar com data e hora
+# Importações para trabalhar com data e hora
 from django.utils import timezone
 from datetime import timedelta
 
@@ -15,7 +15,7 @@ from .models import (
     SolicitacaoAlteracaoEndereco,
     SolicitacaoAlteracaoBancaria,
     RegistroPonto,
-    Funcionario,  # Adicionado para a lógica
+    Funcionario,
 )
 
 
@@ -87,7 +87,6 @@ def home_view(request):
                 )
                 return redirect("funcionarios:home")
 
-    # --- LÓGICA PARA EXIBIR STATUS DAS PAUSAS ---
     hoje = timezone.now().date()
     pausas_hoje_count = 0
     regras_cargo = funcionario.cargo
@@ -96,7 +95,6 @@ def home_view(request):
         pausas_hoje_count = RegistroPonto.objects.filter(
             funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__date=hoje
         ).count()
-    # --- FIM DA LÓGICA DE PAUSAS ---
 
     solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(
         funcionario=funcionario
@@ -175,6 +173,20 @@ def bate_ponto_view(request):
             )
             return redirect("funcionarios:home")
 
+    status_map = {
+        "ENTRADA": "DISPONIVEL",
+        "SAIDA_PAUSA": "EM_PAUSA",
+        "VOLTA_PAUSA": "DISPONIVEL",
+        "SAIDA_ALMOCO": "EM_PAUSA",
+        "VOLTA_ALMOCO": "DISPONIVEL",
+        "SAIDA": "OFFLINE",
+    }
+
+    funcionario.status_operacional = status_map.get(
+        tipo_ponto, funcionario.status_operacional
+    )
+    funcionario.save()
+
     RegistroPonto.objects.create(funcionario=funcionario, tipo=tipo_ponto)
     messages.success(request, "Ponto registrado com sucesso!")
     return redirect("funcionarios:home")
@@ -183,3 +195,11 @@ def bate_ponto_view(request):
 def logout_view(request):
     logout(request)
     return redirect("funcionarios:login")
+
+
+# --- NOVA VIEW PARA SERVIR A TABELA VIA HTMX ---
+@login_required
+def tabela_equipe_view(request):
+    supervisor = request.user.funcionario
+    equipe = supervisor.equipe.all()
+    return render(request, "funcionarios/_tabela_equipe.html", {"equipe": equipe})

@@ -31,4 +31,5 @@ urlpatterns = [
         views.supervisor_dashboard_view,
         name="supervisor_dashboard",
     ),
+    path("supervisor/tabela-equipe/", views.tabela_equipe_view, name="tabela_equipe"),
 ]

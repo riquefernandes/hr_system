@@ -1,13 +1,11 @@
-# funcionarios/models.py (VERSÃO FINAL E CORRIGIDA)
+# funcionarios/models.py
 from django.db import models
 from django.contrib.auth.models import User
 from localflavor.br.models import BRCPFField
 
-# --- Modelos de Apoio (Definidos Primeiro) ---
-
 
 class Cargo(models.Model):
-    nome = models.CharField(max_length=100)
+    nome = models.CharField(max_length=255)
     max_pausas_diarias = models.PositiveIntegerField(
         default=2,
         help_text="Número máximo de pausas curtas (ex: café) permitidas por dia.",
@@ -16,6 +14,9 @@ class Cargo(models.Model):
         default=20,
         help_text="Duração total máxima de todas as pausas somadas, em minutos.",
     )
+    cbo = models.CharField(
+        max_length=10, unique=True, null=True, blank=True
+    )  # Adicione null=True e blank=True
 
     def __str__(self):
         return self.nome
@@ -35,10 +36,12 @@ class Banco(models.Model):
         return self.nome
 
 
-# --- Modelo Principal ---
-
-
 class Funcionario(models.Model):
+    STATUS_OPERACIONAL_CHOICES = [
+        ("DISPONIVEL", "Disponível"),
+        ("EM_PAUSA", "Em Pausa"),
+        ("OFFLINE", "Offline"),
+    ]
     ESCOLARIDADE_CHOICES = [
         ("EF", "Ensino Fundamental"),
         ("EM", "Ensino Médio"),
@@ -76,6 +79,9 @@ class Funcionario(models.Model):
     data_contratacao = models.DateField()
     data_demissao = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="ATIVO")
+    status_operacional = models.CharField(
+        max_length=20, choices=STATUS_OPERACIONAL_CHOICES, default="OFFLINE"
+    )
     cep = models.CharField(max_length=9)
     rua = models.CharField(max_length=255)
     numero = models.CharField(max_length=20)
@@ -105,8 +111,8 @@ class Funcionario(models.Model):
         return self.nome_completo
 
 
-# --- Modelos de Solicitações ---
 class SolicitacaoAlteracaoEndereco(models.Model):
+    # ... (código sem alterações)
     STATUS_CHOICES = [("P", "Pendente"), ("A", "Aprovado"), ("R", "Recusado")]
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
     cep = models.CharField(max_length=9)
@@ -125,6 +131,7 @@ class SolicitacaoAlteracaoEndereco(models.Model):
 
 
 class SolicitacaoAlteracaoBancaria(models.Model):
+    # ... (código sem alterações)
     STATUS_CHOICES = [("P", "Pendente"), ("A", "Aprovado"), ("R", "Recusado")]
     funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE)
     banco = models.ForeignKey(Banco, on_delete=models.SET_NULL, null=True)
@@ -138,12 +145,12 @@ class SolicitacaoAlteracaoBancaria(models.Model):
         return f"Solicitação Bancária de {self.funcionario.nome_completo}"
 
 
-# --- ESTA CLASSE ESTAVA INDENTADA ERRADO. AGORA ESTÁ CORRETA ---
 class RegistroPonto(models.Model):
+    # ... (código sem alterações)
     TIPO_REGISTRO_CHOICES = [
         ("ENTRADA", "Entrada"),
-        ("SAIDA_PAUSA", "Saída para Pausa"),  # <-- Novo
-        ("VOLTA_PAUSA", "Volta da Pausa"),  # <-- Novo
+        ("SAIDA_PAUSA", "Saída para Pausa"),
+        ("VOLTA_PAUSA", "Volta da Pausa"),
         ("SAIDA_ALMOCO", "Saída Almoço"),
         ("VOLTA_ALMOCO", "Volta Almoço"),
         ("SAIDA", "Saída"),
