@@ -5,10 +5,11 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import PasswordChangeView
 from django.views.decorators.http import require_POST
+from django.db.models import Sum, Q
 
 # Importações para trabalhar com data e hora
 from django.utils import timezone
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 from .forms import SolicitacaoAlteracaoEnderecoForm, SolicitacaoAlteracaoBancariaForm
 from .models import (
@@ -16,6 +17,10 @@ from .models import (
     SolicitacaoAlteracaoBancaria,
     RegistroPonto,
     Funcionario,
+    RegraDePausa,  # Adicionado para verificar as regras
+    # Novos modelos para Escala e Banco de Horas
+    FuncionarioEscala,
+    BancoDeHoras,
 )
 
 
@@ -87,15 +92,48 @@ def home_view(request):
                 )
                 return redirect("funcionarios:home")
 
-    hoje = timezone.now().date()
+    # --- LÓGICA DE DADOS PARA O TEMPLATE ---
+    agora = timezone.now()
+    inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+    fim_do_dia = agora.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+    # Lógica de Pausas
     pausas_hoje_count = 0
     regras_cargo = funcionario.cargo
-
     if regras_cargo:
         pausas_hoje_count = RegistroPonto.objects.filter(
-            funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__date=hoje
+            funcionario=funcionario,
+            tipo="SAIDA_PAUSA",
+            timestamp__range=(inicio_do_dia, fim_do_dia),
         ).count()
 
+    ultima_pausa = None
+    if funcionario.status_operacional == "EM_PAUSA":
+        ultima_pausa = (
+            RegistroPonto.objects.filter(
+                funcionario=funcionario,
+                tipo__in=["SAIDA_PAUSA", "SAIDA_ALMOCO"],
+                timestamp__range=(inicio_do_dia, fim_do_dia),
+            )
+            .order_by("-timestamp")
+            .first()
+        )
+
+    # Lógica de Escala e Banco de Horas
+    escala_atual = FuncionarioEscala.objects.filter(
+        funcionario=funcionario, data_inicio__lte=agora.date()
+    ).filter(Q(data_fim__gte=agora.date()) | Q(data_fim__isnull=True)).first()
+
+    saldo_total_minutos = (
+        BancoDeHoras.objects.filter(funcionario=funcionario).aggregate(
+            total=Sum("minutos")
+        )["total"]
+        or 0
+    )
+    saldo_horas = int(saldo_total_minutos // 60)
+    saldo_minutos_restantes = int(saldo_total_minutos % 60)
+
+    # Lógica de Solicitações
     solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(
         funcionario=funcionario
     ).order_by("-data_solicitacao")
@@ -111,6 +149,10 @@ def home_view(request):
         "solicitacoes_bancarias": solicitacoes_bancarias,
         "pausas_hoje_count": pausas_hoje_count,
         "regras_cargo": regras_cargo,
+        "ultima_pausa": ultima_pausa,
+        "escala_atual": escala_atual,
+        "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",
+        "saldo_banco_horas_negativo": saldo_total_minutos < 0,
     }
     return render(request, "funcionarios/home.html", context)
 
@@ -120,38 +162,102 @@ def home_view(request):
 def bate_ponto_view(request):
     funcionario = request.user.funcionario
     tipo_ponto = request.POST.get("tipo_ponto")
+    agora = timezone.now()
 
     if not tipo_ponto:
         messages.error(request, "Você precisa selecionar um tipo de registro.")
         return redirect("funcionarios:home")
 
-    if tipo_ponto == "SAIDA_PAUSA":
-        regras_cargo = funcionario.cargo
-        hoje = timezone.now().date()
+    # --- LÓGICA DE RESTRIÇÃO DE BATER PONTO DE ENTRADA ---
+    if tipo_ponto == "ENTRADA":
+        # Usa a data local para evitar problemas com fuso horário em turnos noturnos
+        data_local = timezone.localtime(agora).date()
 
-        if not regras_cargo:
+        escala_atual = (
+            FuncionarioEscala.objects.filter(
+                funcionario=funcionario, data_inicio__lte=data_local
+            )
+            .filter(Q(data_fim__gte=data_local) | Q(data_fim__isnull=True))
+            .first()
+        )
+
+        if not escala_atual:
+            messages.error(
+                request, "Você não tem uma escala de trabalho definida. Contate o RH."
+            )
+            return redirect("funcionarios:home")
+
+        escala = escala_atual.escala
+        horario_entrada_escala = escala.horario_entrada
+
+        # Define a janela de tolerância para bater o ponto
+        tolerancia_antes = timedelta(minutes=30)
+        tolerancia_depois = timedelta(minutes=60)
+
+        # Cria um datetime "naive" (sem fuso horário) para o início da jornada na data local
+        inicio_jornada_naive = datetime.combine(data_local, horario_entrada_escala)
+
+        # Torna o datetime "aware" (com fuso horário) usando a configuração do Django
+        inicio_jornada_aware = timezone.make_aware(inicio_jornada_naive)
+
+        # Calcula o início e o fim da janela permitida
+        inicio_janela = inicio_jornada_aware - tolerancia_antes
+        fim_janela = inicio_jornada_aware + tolerancia_depois
+
+        if not (inicio_janela <= agora <= fim_janela):
+            messages.error(
+                request,
+                f"Fora do horário! Só é permitido registrar entrada entre "
+                f"{inicio_janela.strftime('%H:%M')} e {fim_janela.strftime('%H:%M')}.",
+            )
+            return redirect("funcionarios:home")
+
+    # --- LÓGICA DE VERIFICAÇÃO DE PAUSA ATUALIZADA ---
+    if tipo_ponto == "SAIDA_PAUSA":
+        cargo = funcionario.cargo
+
+        # Cria o intervalo de tempo para o dia de hoje de forma segura
+        inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+        fim_do_dia = agora.replace(hour=23, minute=59, second=59, microsecond=999999)
+
+        if not cargo:
             messages.error(
                 request,
                 "Não foi possível verificar as regras de pausa (cargo não definido).",
             )
             return redirect("funcionarios:home")
 
-        pausas_hoje = RegistroPonto.objects.filter(
-            funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__date=hoje
-        ).count()
+        # Busca as regras de pausa para o cargo
+        regras_pausa = cargo.regras_de_pausa.all()
+        max_pausas_diarias = regras_pausa.count()
+        duracao_max_pausas_minutos = (
+            regras_pausa.aggregate(total=Sum("duracao_minutos"))["total"] or 0
+        )
 
-        if pausas_hoje >= regras_cargo.max_pausas_diarias:
+        # Conta as pausas de hoje usando o intervalo de tempo
+        pausas_hoje = (
+            RegistroPonto.objects.filter(
+                funcionario=funcionario,
+                tipo="SAIDA_PAUSA",
+                timestamp__range=(inicio_do_dia, fim_do_dia),
+            ).count()
+        )
+
+        if pausas_hoje >= max_pausas_diarias:
             messages.error(
                 request,
-                f"Você já atingiu o limite de {regras_cargo.max_pausas_diarias} pausas por dia.",
+                f"Você já atingiu o limite de {max_pausas_diarias} pausas por dia.",
             )
             return redirect("funcionarios:home")
 
-        registros_pausa_hoje = RegistroPonto.objects.filter(
-            funcionario=funcionario,
-            tipo__in=["SAIDA_PAUSA", "VOLTA_PAUSA"],
-            timestamp__date=hoje,
-        ).order_by("timestamp")
+        # Calcula a duração das pausas de hoje usando o intervalo de tempo
+        registros_pausa_hoje = (
+            RegistroPonto.objects.filter(
+                funcionario=funcionario,
+                tipo__in=["SAIDA_PAUSA", "VOLTA_PAUSA"],
+                timestamp__range=(inicio_do_dia, fim_do_dia),
+            ).order_by("timestamp")
+        )
 
         duracao_total_pausas = timedelta()
         ultimo_inicio_pausa = None
@@ -165,14 +271,17 @@ def bate_ponto_view(request):
 
         if (
             duracao_total_pausas.total_seconds() / 60
-            >= regras_cargo.duracao_max_pausas_minutos
+            >= duracao_max_pausas_minutos
         ):
             messages.error(
                 request,
-                f"Você já atingiu o tempo limite de {regras_cargo.duracao_max_pausas_minutos} minutos em pausas hoje.",
+                f"Você já atingiu o tempo limite de {duracao_max_pausas_minutos} minutos em pausas hoje.",
             )
             return redirect("funcionarios:home")
 
+    # --- FIM DA LÓGICA DE VERIFICAÇÃO ---
+
+    # Mapeia o tipo de ponto para o novo status
     status_map = {
         "ENTRADA": "DISPONIVEL",
         "SAIDA_PAUSA": "EM_PAUSA",
@@ -182,19 +291,16 @@ def bate_ponto_view(request):
         "SAIDA": "OFFLINE",
     }
 
+    # Atualiza o status do funcionário
     funcionario.status_operacional = status_map.get(
         tipo_ponto, funcionario.status_operacional
     )
     funcionario.save()
 
+    # Cria o registro de ponto e redireciona
     RegistroPonto.objects.create(funcionario=funcionario, tipo=tipo_ponto)
     messages.success(request, "Ponto registrado com sucesso!")
     return redirect("funcionarios:home")
-
-
-def logout_view(request):
-    logout(request)
-    return redirect("funcionarios:login")
 
 
 # --- NOVA VIEW PARA SERVIR A TABELA VIA HTMX ---
@@ -202,4 +308,55 @@ def logout_view(request):
 def tabela_equipe_view(request):
     supervisor = request.user.funcionario
     equipe = supervisor.equipe.all()
+    agora = timezone.now()
+    inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Para cada membro da equipe, buscamos a última pausa e verificamos os limites
+    for membro in equipe:
+        membro.ultima_pausa = None
+        membro.limite_pausa_segundos = 0  # Inicializa com 0
+
+        if membro.status_operacional == "EM_PAUSA":
+            # Busca o registro da última saída para pausa/almoço
+            ultima_pausa_registro = (
+                RegistroPonto.objects.filter(
+                    funcionario=membro, tipo__in=["SAIDA_PAUSA", "SAIDA_ALMOCO"]
+                )
+                .order_by("-timestamp")
+                .first()
+            )
+            membro.ultima_pausa = ultima_pausa_registro
+
+            # Se for uma pausa normal (não almoço), verifica a regra específica
+            if (
+                ultima_pausa_registro
+                and ultima_pausa_registro.tipo == "SAIDA_PAUSA"
+            ):
+                # Conta quantas pausas o funcionário já fez hoje para saber qual regra aplicar
+                pausas_hoje_count = RegistroPonto.objects.filter(
+                    funcionario=membro,
+                    tipo="SAIDA_PAUSA",
+                    timestamp__gte=inicio_do_dia,
+                ).count()
+
+                # Busca a regra de pausa correspondente à ordem da pausa atual
+                regra_atual = RegraDePausa.objects.filter(
+                    cargo=membro.cargo, ordem=pausas_hoje_count
+                ).first()
+
+                if regra_atual:
+                    # Define o limite em segundos para passar ao template
+                    membro.limite_pausa_segundos = regra_atual.duracao_minutos * 60
+        
+        # Busca a escala atual do funcionário
+        membro.escala_atual = FuncionarioEscala.objects.filter(
+            funcionario=membro, data_inicio__lte=agora.date()
+        ).filter(Q(data_fim__gte=agora.date()) | Q(data_fim__isnull=True)).first()
+
+
     return render(request, "funcionarios/_tabela_equipe.html", {"equipe": equipe})
+
+
+def logout_view(request):  # <-- Garanta que esta função existe
+    logout(request)
+    return redirect("funcionarios:login")

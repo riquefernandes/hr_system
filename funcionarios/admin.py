@@ -1,4 +1,4 @@
-# funcionarios/admin.py
+# funcionarios/admin.py (VERSÃO FINAL E CORRIGIDA)
 from django.contrib import admin
 from .models import (
     Cargo,
@@ -7,17 +7,24 @@ from .models import (
     Funcionario,
     SolicitacaoAlteracaoEndereco,
     SolicitacaoAlteracaoBancaria,
+    RegraDePausa,
+    # Novos modelos para Escala e Banco de Horas
+    Escala,
+    FuncionarioEscala,
+    BancoDeHoras,
 )
 from django.utils import timezone
 
 
+# --- INLINE PARA ESCALAS DO FUNCIONÁRIO ---
+class FuncionarioEscalaInline(admin.TabularInline):
+    model = FuncionarioEscala
+    extra = 1
+
+
 # --- CLASSE DE ADMIN PARA FUNCIONARIO ---
 class FuncionarioAdmin(admin.ModelAdmin):
-    readonly_fields = (
-        "email_usuario",
-        "matricula_usuario",
-    )
-
+    readonly_fields = ("email_usuario", "matricula_usuario")
     fieldsets = (
         (
             "Informações de Login",
@@ -59,12 +66,11 @@ class FuncionarioAdmin(admin.ModelAdmin):
         ("Dados de Trabalho", {"fields": ("cargo", "centro_de_custo", "supervisor")}),
         ("Dados Bancários", {"fields": ("banco", "agencia", "conta")}),
     )
-
     list_display = ("nome_completo", "matricula_usuario", "cpf", "cargo", "status")
     list_filter = ("status", "cargo", "centro_de_custo", "banco")
     search_fields = ("nome_completo", "cpf", "user__username")
+    inlines = [FuncionarioEscalaInline]
 
-    # --- MÉTODO ADICIONADO PARA FILTRAR O DROPDOWN ---
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "supervisor":
             kwargs["queryset"] = Funcionario.objects.filter(
@@ -84,8 +90,18 @@ class FuncionarioAdmin(admin.ModelAdmin):
             return obj.user.username
         return "Será gerada ao salvar"
 
-    class Media:
-        js = ("funcionarios/js/cep_lookup.js",)
+
+# --- INLINE PARA REGRAS DE PAUSA ---
+class RegraDePausaInline(admin.TabularInline):
+    model = RegraDePausa
+    extra = 1  # Mostra 1 campo extra em branco para adicionar novas regras
+
+
+# --- CLASSE DE ADMIN PARA CARGO ---
+class CargoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "cbo")
+    search_fields = ("nome", "cbo")
+    inlines = [RegraDePausaInline]  # Adiciona as regras de pausa na página do cargo
 
 
 # --- Ações Customizadas ---
@@ -93,15 +109,7 @@ class FuncionarioAdmin(admin.ModelAdmin):
 def aprovar_solicitacoes_endereco(modeladmin, request, queryset):
     for solicitacao in queryset:
         f = solicitacao.funcionario
-        (
-            f.cep,
-            f.rua,
-            f.numero,
-            f.bairro,
-            f.cidade,
-            f.estado,
-            f.complemento,
-        ) = (
+        (f.cep, f.rua, f.numero, f.bairro, f.cidade, f.estado, f.complemento) = (
             solicitacao.cep,
             solicitacao.rua,
             solicitacao.numero,
@@ -119,11 +127,13 @@ def aprovar_solicitacoes_endereco(modeladmin, request, queryset):
 @admin.action(description="Aprovar solicitações bancárias selecionadas")
 def aprovar_solicitacoes_bancarias(modeladmin, request, queryset):
     for solicitacao in queryset:
-        funcionario = solicitacao.funcionario
-        funcionario.banco = solicitacao.banco
-        funcionario.agencia = solicitacao.agencia
-        funcionario.conta = solicitacao.conta
-        funcionario.save()
+        f = solicitacao.funcionario
+        f.banco, f.agencia, f.conta = (
+            solicitacao.banco,
+            solicitacao.agencia,
+            solicitacao.conta,
+        )
+        f.save()
         solicitacao.status = "A"
         solicitacao.data_aprovacao = timezone.now()
         solicitacao.save()
@@ -141,9 +151,38 @@ class SolicitacaoAlteracaoBancariaAdmin(admin.ModelAdmin):
 
 
 # --- Registros no Admin ---
-admin.site.register(Cargo)
+admin.site.register(Cargo, CargoAdmin)  # Atualizado para usar a classe customizada
 admin.site.register(CentroDeCusto)
 admin.site.register(Banco)
 admin.site.register(Funcionario, FuncionarioAdmin)
 admin.site.register(SolicitacaoAlteracaoEndereco, SolicitacaoAlteracaoEnderecoAdmin)
 admin.site.register(SolicitacaoAlteracaoBancaria, SolicitacaoAlteracaoBancariaAdmin)
+admin.site.register(RegraDePausa)  # Opcional, para gerenciar todas as regras de uma vez
+
+
+# --- Classes de Admin para Escala e Banco de Horas ---
+@admin.register(Escala)
+class EscalaAdmin(admin.ModelAdmin):
+    list_display = (
+        "nome",
+        "horario_entrada",
+        "horario_saida",
+        "dias_semana",
+        "duracao_almoco_minutos",
+    )
+    search_fields = ("nome",)
+
+
+@admin.register(BancoDeHoras)
+class BancoDeHorasAdmin(admin.ModelAdmin):
+    list_display = ("funcionario", "data", "minutos", "descricao", "processado_em")
+    list_filter = ("funcionario", "data")
+    search_fields = ("funcionario__nome_completo", "descricao")
+
+    # Torna o admin de Banco de Horas somente leitura, pois será populado pelo sistema
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+

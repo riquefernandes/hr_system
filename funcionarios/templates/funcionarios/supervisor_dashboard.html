@@ -9,4 +9,51 @@
     <div class="card" hx-get="{% url 'funcionarios:tabela_equipe' %}" hx-trigger="load, every 15s" hx-swap="innerHTML">
         <div class="card-body text-center"><p>Carregando dados da equipe...</p></div>
     </div>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // --- Lógica do Cronômetro de Pausa ---
+        function updatePauseTimers() {
+            const timerElements = document.querySelectorAll('.pause-timer');
+            
+            timerElements.forEach(timer => {
+                if (!timer.dataset.pausestart) return;
+
+                const startTime = new Date(timer.dataset.pausestart);
+                const now = new Date();
+                const diffSeconds = Math.floor((now - startTime) / 1000);
+
+                if (isNaN(diffSeconds)) {
+                    timer.textContent = '';
+                    return;
+                }
+
+                // Formata o tempo para (HH:MM:SS)
+                const hours = Math.floor(diffSeconds / 3600);
+                const minutes = Math.floor((diffSeconds % 3600) / 60);
+                const seconds = diffSeconds % 60;
+                const pad = (num) => num.toString().padStart(2, '0');
+                timer.textContent = `(${pad(hours)}:${pad(minutes)}:${pad(seconds)})`;
+
+                // Verifica se o limite de tempo da pausa foi excedido
+                const limitSeconds = parseInt(timer.dataset.pauselimit, 10);
+                if (limitSeconds > 0 && diffSeconds > limitSeconds) {
+                    // Aplica estilo de alerta se o tempo for excedido
+                    timer.classList.add('text-danger', 'fw-bold');
+                } else {
+                    // Remove o estilo de alerta caso contrário
+                    timer.classList.remove('text-danger', 'fw-bold');
+                }
+            });
+        }
+
+        // Inicia a atualização dos cronômetros
+        updatePauseTimers(); 
+        setInterval(updatePauseTimers, 1000);
+
+        // Garante que os cronômetros sejam atualizados após o HTMX carregar a tabela
+        document.body.addEventListener('htmx:afterSwap', function(event) {
+            updatePauseTimers();
+        });
+    });
+</script>
 {% endblock %}

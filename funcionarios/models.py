@@ -4,22 +4,72 @@ from django.contrib.auth.models import User
 from localflavor.br.models import BRCPFField
 
 
-class Cargo(models.Model):
-    nome = models.CharField(max_length=255)
-    max_pausas_diarias = models.PositiveIntegerField(
-        default=2,
-        help_text="Número máximo de pausas curtas (ex: café) permitidas por dia.",
+class Escala(models.Model):
+    """Define um padrão de horário de trabalho e dias da semana."""
+
+    nome = models.CharField(
+        max_length=100, unique=True, help_text="Ex: Seg-Sáb 08:00-14:20"
     )
-    duracao_max_pausas_minutos = models.PositiveIntegerField(
-        default=20,
-        help_text="Duração total máxima de todas as pausas somadas, em minutos.",
+    dias_semana = models.CharField(
+        max_length=15,
+        help_text="Dias da semana separados por vírgula (0=Seg, 1=Ter, ..., 6=Dom).",
     )
-    cbo = models.CharField(
-        max_length=10, unique=True, null=True, blank=True
-    )  # Adicione null=True e blank=True
+    horario_entrada = models.TimeField()
+    horario_saida = models.TimeField()
+    duracao_almoco_minutos = models.PositiveIntegerField(
+        default=60, help_text="Duração do intervalo de almoço padrão em minutos."
+    )
+
+    class Meta:
+        verbose_name = "Escala de Trabalho"
+        verbose_name_plural = "Escalas de Trabalho"
 
     def __str__(self):
         return self.nome
+
+
+class Cargo(models.Model):
+    nome = models.CharField(max_length=255)
+    cbo = models.CharField(
+        max_length=10,
+        unique=True,
+        null=True,
+        blank=True,
+        help_text="Digite o código CBO (ex: 4223-10) e saia do campo.",
+    )
+    escala_padrao = models.ForeignKey(
+        Escala,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        help_text="A escala padrão para novos funcionários neste cargo.",
+    )
+
+    def __str__(self):
+        return self.nome
+
+
+class RegraDePausa(models.Model):
+    cargo = models.ForeignKey(
+        Cargo, on_delete=models.CASCADE, related_name="regras_de_pausa"
+    )
+    nome = models.CharField(max_length=100, help_text="Ex: Pausa Café 1")
+    ordem = models.PositiveIntegerField(
+        help_text="A ordem em que a pausa deve ser tirada (1 para a primeira, 2 para a segunda, etc.)"
+    )
+    duracao_minutos = models.PositiveIntegerField(
+        help_text="A duração desta pausa específica em minutos."
+    )
+
+    class Meta:
+        ordering = ["cargo", "ordem"]
+        # Garante que não podemos ter duas "primeiras pausas" para o mesmo cargo
+        unique_together = ("cargo", "ordem")
+        verbose_name = "Regra de Pausa"
+        verbose_name_plural = "Regras de Pausa"
+
+    def __str__(self):
+        return f"{self.cargo.nome} - Pausa #{self.ordem} ({self.duracao_minutos} min)"
 
 
 class CentroDeCusto(models.Model):
@@ -109,6 +159,54 @@ class Funcionario(models.Model):
 
     def __str__(self):
         return self.nome_completo
+
+
+class FuncionarioEscala(models.Model):
+    """Associa um funcionário a uma escala por um período de tempo."""
+
+    funcionario = models.ForeignKey(
+        Funcionario, on_delete=models.CASCADE, related_name="escalas"
+    )
+    escala = models.ForeignKey(Escala, on_delete=models.PROTECT)
+    data_inicio = models.DateField()
+    data_fim = models.DateField(
+        null=True,
+        blank=True,
+        help_text="Deixe em branco se for a escala atual/permanente.",
+    )
+
+    class Meta:
+        ordering = ["-data_inicio"]
+        verbose_name = "Escala do Funcionário"
+        verbose_name_plural = "Escalas dos Funcionários"
+
+    def __str__(self):
+        return f"{self.funcionario.nome_completo} - {self.escala.nome} (a partir de {self.data_inicio})"
+
+
+class BancoDeHoras(models.Model):
+    """Registra o balanço de horas (créditos e débitos) para um funcionário."""
+
+    funcionario = models.ForeignKey(
+        Funcionario, on_delete=models.CASCADE, related_name="banco_de_horas"
+    )
+    data = models.DateField()
+    minutos = models.IntegerField(
+        help_text="Minutos a serem creditados (positivo) ou debitados (negativo)."
+    )
+    descricao = models.CharField(
+        max_length=255, help_text="Ex: Horas extras, Atraso, Saída antecipada."
+    )
+    processado_em = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data"]
+        verbose_name = "Registro de Banco de Horas"
+        verbose_name_plural = "Registros de Banco de Horas"
+
+    def __str__(self):
+        status = "Crédito" if self.minutos > 0 else "Débito"
+        return f"{self.funcionario.nome_completo}: {abs(self.minutos)} min ({status}) em {self.data}"
 
 
 class SolicitacaoAlteracaoEndereco(models.Model):

@@ -5,6 +5,7 @@
                 <th>Matrícula</th>
                 <th>Nome Completo</th>
                 <th>Cargo</th>
+                <th>Escala</th>
                 <th>Status Operacional</th>
             </tr>
         </thead>
@@ -14,11 +15,20 @@
                 <td>{{ membro.user.username }}</td>
                 <td>{{ membro.nome_completo }}</td>
                 <td>{{ membro.cargo.nome }}</td>
+                <td>{{ membro.escala_atual.escala.nome|default:"-" }}</td>
                 <td>
                     {% if membro.status_operacional == 'DISPONIVEL' %}
                         <span class="badge bg-success">{{ membro.get_status_operacional_display }}</span>
+                    
                     {% elif membro.status_operacional == 'EM_PAUSA' %}
                         <span class="badge bg-warning text-dark">{{ membro.get_status_operacional_display }}</span>
+                        
+                        {% if membro.ultima_pausa %}
+                        <span class="text-muted small pause-timer" 
+      data-pausestart="{{ membro.ultima_pausa.timestamp.isoformat }}"
+      data-pauselimit="{{ membro.limite_pausa_segundos }}"></span>
+                        {% endif %}
+
                     {% else %}
                         <span class="badge bg-secondary">{{ membro.get_status_operacional_display }}</span>
                     {% endif %}
@@ -26,7 +36,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="4" class="text-center">Você ainda não tem ninguém na sua equipe.</td>
+                <td colspan="5" class="text-center">Você ainda não tem ninguém na sua equipe.</td>
             </tr>
             {% endfor %}
         </tbody>
