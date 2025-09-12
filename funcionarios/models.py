@@ -209,6 +209,46 @@ class BancoDeHoras(models.Model):
         return f"{self.funcionario.nome_completo}: {abs(self.minutos)} min ({status}) em {self.data}"
 
 
+class SolicitacaoHorario(models.Model):
+    """Registra um pedido de um funcionário para bater o ponto fora do horário permitido."""
+
+    STATUS_CHOICES = [
+        ("PENDENTE", "Pendente"),
+        ("APROVADO", "Aprovado"),
+        ("RECUSADO", "Recusado"),
+    ]
+
+    funcionario = models.ForeignKey(
+        Funcionario, on_delete=models.CASCADE, related_name="solicitacoes_horario"
+    )
+    data_hora_ponto = models.DateTimeField(
+        help_text="Data e hora em que o funcionário deseja registrar o ponto."
+    )
+    motivo = models.TextField(max_length=500)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDENTE")
+
+    # Quem e quando analisou a solicitação
+    analisado_por = models.ForeignKey(
+        Funcionario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_horario_analisadas",
+    )
+    data_analise = models.DateTimeField(null=True, blank=True)
+
+    # Data de criação da solicitação
+    data_solicitacao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data_solicitacao"]
+        verbose_name = "Solicitação de Ponto Fora de Hora"
+        verbose_name_plural = "Solicitações de Ponto Fora de Hora"
+
+    def __str__(self):
+        return f"Solicitação de {self.funcionario.nome_completo} para {self.data_hora_ponto.strftime('%d/%m/%Y %H:%M')}"
+
+
 class SolicitacaoAlteracaoEndereco(models.Model):
     # ... (código sem alterações)
     STATUS_CHOICES = [("P", "Pendente"), ("A", "Aprovado"), ("R", "Recusado")]

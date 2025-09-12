@@ -32,4 +32,19 @@ urlpatterns = [
         name="supervisor_dashboard",
     ),
     path("supervisor/tabela-equipe/", views.tabela_equipe_view, name="tabela_equipe"),
+    path(
+        "solicitar-horario/",
+        views.solicitar_horario_view,
+        name="solicitar_horario",
+    ),
+    path(
+        "solicitacao-horario/<int:pk>/aprovar/",
+        views.aprovar_solicitacao_horario,
+        name="aprovar_solicitacao_horario",
+    ),
+    path(
+        "solicitacao-horario/<int:pk>/recusar/",
+        views.recusar_solicitacao_horario,
+        name="recusar_solicitacao_horario",
+    ),
 ]

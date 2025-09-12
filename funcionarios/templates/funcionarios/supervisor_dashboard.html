@@ -3,6 +3,31 @@
 {% block content %}
     <h1 class="h2">Dashboard do Supervisor</h1>
     <p class="lead">Bem-vindo, {{ supervisor.nome_completo }}.</p>
+
+    <div class="card mb-4">
+        <div class="card-header fw-bold">Solicitações de Ponto Fora de Hora</div>
+        <div class="card-body">
+            {% if solicitacoes_pendentes %}
+                <ul class="list-group">
+                    {% for solicitacao in solicitacoes_pendentes %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ solicitacao.funcionario.nome_completo }}</strong> quer registrar ponto em {{ solicitacao.data_hora_ponto|date:"d/m/Y H:i" }}.
+                                <p class="mb-0 text-muted small">Motivo: {{ solicitacao.motivo }}</p>
+                            </div>
+                            <div>
+                                <a href="{% url 'funcionarios:aprovar_solicitacao_horario' solicitacao.id %}" class="btn btn-success btn-sm">Aprovar</a>
+                                <a href="{% url 'funcionarios:recusar_solicitacao_horario' solicitacao.id %}" class="btn btn-danger btn-sm">Recusar</a>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="text-muted">Nenhuma solicitação pendente no momento.</p>
+            {% endif %}
+        </div>
+    </div>
+
     <hr>
     <h2 class="h4">Sua Equipe</h2>
     <p>Abaixo estão os funcionários que estão sob sua supervisão direta. O status é atualizado a cada 15 segundos.</p>

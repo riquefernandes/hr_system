@@ -12,6 +12,7 @@ from .models import (
     Escala,
     FuncionarioEscala,
     BancoDeHoras,
+    SolicitacaoHorario,
 )
 from django.utils import timezone
 
@@ -185,4 +186,25 @@ class BancoDeHorasAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(SolicitacaoHorario)
+class SolicitacaoHorarioAdmin(admin.ModelAdmin):
+    list_display = (
+        "funcionario",
+        "data_hora_ponto",
+        "status",
+        "analisado_por",
+        "data_analise",
+    )
+    list_filter = ("status",)
+    search_fields = ("funcionario__nome_completo",)
+    readonly_fields = (
+        "funcionario",
+        "data_hora_ponto",
+        "motivo",
+        "analisado_por",
+        "data_analise",
+        "data_solicitacao",
+    )
 

@@ -1,0 +1,28 @@
+{% extends 'funcionarios/base.html' %}
+
+{% block title %}Solicitar Ponto Fora de Hora{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header fw-bold">Solicitar Registro de Ponto Fora do Horário</div>
+            <div class="card-body">
+                <p class="card-text">
+                    Você está tentando registrar um ponto de entrada fora da janela de tempo permitida pela sua escala. 
+                    Por favor, informe abaixo o motivo para que seu supervisor possa analisar e aprovar.
+                </p>
+                <hr>
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                        <a href="{% url 'funcionarios:home' %}" class="btn btn-secondary me-md-2">Cancelar</a>
+                        <button type="submit" class="btn btn-primary">Enviar Solicitação</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
