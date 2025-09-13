@@ -16,21 +16,26 @@
                 <button type="submit" class="btn btn-primary btn-lg">Registrar Entrada</button>
             </form>
         {% elif funcionario_data.status_operacional == 'DISPONIVEL' %}
-            {% if proxima_pausa_regra %}
+            <div class="btn-group" role="group" aria-label="Ações de Pausa">
+                {% if proxima_pausa_regra %}
+                    <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA">
+                        <button type="submit" class="btn btn-info">
+                            Pausa Programada ({{ proxima_pausa_regra.nome }})
+                        </button>
+                    </form>
+                {% endif %}
                 <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
                     {% csrf_token %}
-                    <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA">
-                    <button type="submit" class="btn btn-warning btn-lg">
-                        Iniciar Pausa ({{ proxima_pausa_regra.nome }} - {{ proxima_pausa_regra.duracao_minutos }} min)
-                    </button>
+                    <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA_PESSOAL">
+                    <button type="submit" class="btn btn-secondary">Pausa Pessoal</button>
                 </form>
-            {% else %}
-                <p class="mb-0">Você já utilizou todas as suas pausas do dia.</p>
-            {% endif %}
+            </div>
             <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
                 {% csrf_token %}
                 <input type="hidden" name="tipo_ponto" value="SAIDA">
-                <button type="submit" class="btn btn-danger btn-lg ms-2">Registrar Saída</button>
+                <button type="submit" class="btn btn-danger ms-3">Registrar Saída</button>
             </form>
         {% elif funcionario_data.status_operacional == 'EM_PAUSA' %}
             <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">

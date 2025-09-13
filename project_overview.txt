@@ -48,7 +48,7 @@ O `hr_system` é uma aplicação web construída sobre o framework Django, segui
     -   `SolicitacaoHorario`: Registra pedidos de funcionários para bater o ponto fora do horário, incluindo motivo, status (Pendente, Aprovado, Recusado) e informações de análise pelo supervisor.
     -   `SolicitacaoAlteracaoEndereco`: Registra solicitações de funcionários para alterar dados de endereço.
     -   `SolicitacaoAlteracaoBancaria`: Registra solicitações de funcionários para alterar dados bancários.
-    -   `RegistroPonto`: Registra os eventos de ponto (entrada, saída, pausas) de um funcionário.
+    -   `RegistroPonto`: Registra os eventos de ponto (entrada, saída, pausas programadas e pessoais) de um funcionário.
 
 -   `views.py`: Contém a lógica de negócio e as funções que respondem às requisições HTTP.
     -   `login_view`: Lida com a autenticação de usuários.
@@ -101,6 +101,8 @@ O `hr_system` é uma aplicação web construída sobre o framework Django, segui
 
 3.2. Registro de Ponto e Controle de Jornada
 -   **Bater Ponto (Entrada/Saída/Pausas):** Funcionários registram seus eventos de ponto através de uma interface simples.
+-   **Validação de Ponto Único:** O sistema impede que um funcionário registre a 'Entrada' ou a 'Saída' mais de uma vez no mesmo dia. Também previne o registro de 'Saída' antes de uma 'Entrada'.
+-   **Pausa Pessoal:** Além das pausas programadas, o funcionário pode iniciar uma 'Pausa Pessoal' a qualquer momento. O início e o fim são registrados para futuros relatórios.
 -   **Restrição de Entrada por Escala:** Ao tentar registrar a entrada, o sistema verifica se o horário está dentro de uma janela de tolerância (30 minutos antes a 60 minutos depois) do horário de entrada definido na escala do funcionário para aquele dia.
 -   **Solicitação de Ponto Fora de Hora e Aprovação do Supervisor:**
     -   Se o funcionário tentar bater o ponto de entrada fora da janela permitida e não tiver uma solicitação aprovada, ele é redirecionado para um formulário de `SolicitacaoHorario`.

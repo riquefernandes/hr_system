@@ -131,7 +131,7 @@ def home_view(request):
         ultima_pausa = (
             RegistroPonto.objects.filter(
                 funcionario=funcionario,
-                tipo__in=["SAIDA_PAUSA", "SAIDA_ALMOCO"],
+                tipo__in=["SAIDA_PAUSA", "SAIDA_ALMOCO", "SAIDA_PAUSA_PESSOAL"],
                 timestamp__range=(inicio_do_dia, fim_do_dia),
             )
             .order_by("-timestamp")
@@ -251,7 +251,12 @@ def bate_ponto_view(request):
             messages.error(request, "Você não tem mais pausas disponíveis ou elas não estão configuradas para seu cargo.")
             return redirect("funcionarios:home")
 
-    if tipo_ponto == "VOLTA_PAUSA":
+    if tipo_ponto == "SAIDA_PAUSA_PESSOAL":
+        if funcionario.status_operacional != "DISPONIVEL":
+            messages.error(request, f"Você só pode iniciar uma pausa pessoal se estiver 'Disponível'.")
+            return redirect("funcionarios:home")
+
+    if tipo_ponto in ["VOLTA_PAUSA", "VOLTA_PAUSA_PESSOAL"]:
         if funcionario.status_operacional != "EM_PAUSA":
             messages.error(request, f"Você só pode voltar de uma pausa se estiver 'Em Pausa'.")
             return redirect("funcionarios:home")
@@ -269,6 +274,8 @@ def bate_ponto_view(request):
         "ENTRADA": "DISPONIVEL",
         "SAIDA_PAUSA": "EM_PAUSA",
         "VOLTA_PAUSA": "DISPONIVEL",
+        "SAIDA_PAUSA_PESSOAL": "EM_PAUSA",
+        "VOLTA_PAUSA_PESSOAL": "DISPONIVEL",
         "SAIDA_ALMOCO": "EM_PAUSA",
         "VOLTA_ALMOCO": "DISPONIVEL",
         "SAIDA": "OFFLINE",

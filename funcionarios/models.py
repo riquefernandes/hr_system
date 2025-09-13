@@ -287,17 +287,19 @@ class RegistroPonto(models.Model):
     # ... (código sem alterações)
     TIPO_REGISTRO_CHOICES = [
         ("ENTRADA", "Entrada"),
-        ("SAIDA_PAUSA", "Saída para Pausa"),
-        ("VOLTA_PAUSA", "Volta da Pausa"),
+        ("SAIDA", "Saída"),
+        ("SAIDA_PAUSA", "Saída para Pausa Programada"),
+        ("VOLTA_PAUSA", "Volta da Pausa Programada"),
+        ("SAIDA_PAUSA_PESSOAL", "Saída para Pausa Pessoal"),
+        ("VOLTA_PAUSA_PESSOAL", "Volta da Pausa Pessoal"),
         ("SAIDA_ALMOCO", "Saída Almoço"),
         ("VOLTA_ALMOCO", "Volta Almoço"),
-        ("SAIDA", "Saída"),
     ]
     funcionario = models.ForeignKey(
         Funcionario, on_delete=models.CASCADE, related_name="registros_ponto"
     )
     timestamp = models.DateTimeField(auto_now_add=True, verbose_name="Data e Hora")
-    tipo = models.CharField(max_length=20, choices=TIPO_REGISTRO_CHOICES)
+    tipo = models.CharField(max_length=30, choices=TIPO_REGISTRO_CHOICES)
 
     class Meta:
         ordering = ["-timestamp"]
