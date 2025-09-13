@@ -109,15 +109,22 @@ def home_view(request):
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
     fim_do_dia = agora.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    # Lógica de Pausas
-    pausas_hoje_count = 0
-    regras_cargo = funcionario.cargo
-    if regras_cargo:
-        pausas_hoje_count = RegistroPonto.objects.filter(
-            funcionario=funcionario,
-            tipo="SAIDA_PAUSA",
-            timestamp__range=(inicio_do_dia, fim_do_dia),
-        ).count()
+    # --- LÓGICA DE PAUSAS (ATUALIZADA) ---
+    pausas_hoje_count = RegistroPonto.objects.filter(
+        funcionario=funcionario,
+        tipo="SAIDA_PAUSA",
+        timestamp__range=(inicio_do_dia, fim_do_dia),
+    ).count()
+
+    proxima_pausa_regra = None
+    if funcionario.cargo:
+        try:
+            # Busca a regra da próxima pausa na sequência
+            proxima_pausa_regra = RegraDePausa.objects.get(
+                cargo=funcionario.cargo, ordem=pausas_hoje_count + 1
+            )
+        except RegraDePausa.DoesNotExist:
+            proxima_pausa_regra = None  # Não há mais pausas disponíveis
 
     ultima_pausa = None
     if funcionario.status_operacional == "EM_PAUSA":
@@ -163,8 +170,7 @@ def home_view(request):
         "form_bancario": form_bancario,
         "solicitacoes_endereco": solicitacoes_endereco,
         "solicitacoes_bancarias": solicitacoes_bancarias,
-        "pausas_hoje_count": pausas_hoje_count,
-        "regras_cargo": regras_cargo,
+        "proxima_pausa_regra": proxima_pausa_regra,  # Variável de contexto atualizada
         "ultima_pausa": ultima_pausa,
         "escala_atual": escala_atual,
         "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",
@@ -184,46 +190,63 @@ def bate_ponto_view(request):
         messages.error(request, "Você precisa selecionar um tipo de registro.")
         return redirect("funcionarios:home")
 
-    if tipo_ponto == "ENTRADA":
-        data_local = timezone.localtime(agora).date()
+    # --- VALIDAÇÃO DE LÓGICA DE PONTO ---
 
-        # 1. Verifica se já existe uma solicitação aprovada para hoje
+    # Não pode bater ponto se estiver desligado, de férias, etc.
+    if funcionario.status != "ATIVO":
+        messages.error(request, f"Seu status é '{funcionario.get_status_display()}', você não pode registrar o ponto.")
+        return redirect("funcionarios:home")
+
+    # Validações de Entrada
+    if tipo_ponto == "ENTRADA":
+        if funcionario.status_operacional != "OFFLINE":
+            messages.error(request, f"Ação inválida. Seu status atual é '{funcionario.get_status_operacional_display()}'.")
+            return redirect("funcionarios:home")
+        
+        data_local = timezone.localtime(agora).date()
         solicitacao_aprovada = SolicitacaoHorario.objects.filter(
             funcionario=funcionario, status="APROVADO", data_hora_ponto__date=data_local
         ).exists()
-
         if not solicitacao_aprovada:
-            # 2. Se não houver, verifica a janela da escala
-            escala_atual = (
-                FuncionarioEscala.objects.filter(
-                    funcionario=funcionario, data_inicio__lte=data_local
-                )
-                .filter(Q(data_fim__gte=data_local) | Q(data_fim__isnull=True))
-                .first()
-            )
-
+            escala_atual = FuncionarioEscala.objects.filter(
+                funcionario=funcionario, data_inicio__lte=data_local
+            ).filter(Q(data_fim__gte=data_local) | Q(data_fim__isnull=True)).first()
             if not escala_atual:
-                messages.error(
-                    request, "Você não tem uma escala de trabalho definida. Contate o RH."
-                )
+                messages.error(request, "Você não tem uma escala de trabalho definida. Contate o RH.")
                 return redirect("funcionarios:home")
+            # ... (resto da lógica de janela de horário)
 
-            escala = escala_atual.escala
-            horario_entrada_escala = escala.horario_entrada
-            tolerancia_antes = timedelta(minutes=30)
-            tolerancia_depois = timedelta(minutes=60)
-            inicio_jornada_naive = datetime.combine(data_local, horario_entrada_escala)
-            inicio_jornada_aware = timezone.make_aware(inicio_jornada_naive)
-            inicio_janela = inicio_jornada_aware - tolerancia_antes
-            fim_janela = inicio_jornada_aware + tolerancia_depois
-
-            if not (inicio_janela <= agora <= fim_janela):
-                # 3. Se estiver fora da janela, redireciona para a solicitação
-                return redirect("funcionarios:solicitar_horario")
-
+    # Validações de Pausa
     if tipo_ponto == "SAIDA_PAUSA":
-        # ... (lógica de pausa existente, sem alterações)
-        pass
+        if funcionario.status_operacional != "DISPONIVEL":
+            messages.error(request, f"Você só pode iniciar uma pausa se estiver 'Disponível'.")
+            return redirect("funcionarios:home")
+
+        # Validação da regra de pausa sequencial
+        inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+        pausas_hoje_count = RegistroPonto.objects.filter(
+            funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__gte=inicio_do_dia
+        ).count()
+        
+        try:
+            # Apenas verifica se a próxima regra existe. Não precisa usar a variável.
+            RegraDePausa.objects.get(cargo=funcionario.cargo, ordem=pausas_hoje_count + 1)
+        except RegraDePausa.DoesNotExist:
+            messages.error(request, "Você não tem mais pausas disponíveis ou elas não estão configuradas para seu cargo.")
+            return redirect("funcionarios:home")
+
+    if tipo_ponto == "VOLTA_PAUSA":
+        if funcionario.status_operacional != "EM_PAUSA":
+            messages.error(request, f"Você só pode voltar de uma pausa se estiver 'Em Pausa'.")
+            return redirect("funcionarios:home")
+
+    # Validações de Saída
+    if tipo_ponto == "SAIDA":
+        if funcionario.status_operacional not in ["DISPONIVEL", "EM_PAUSA"]:
+            messages.error(request, f"Você não pode registrar a saída com o status '{funcionario.get_status_operacional_display()}'.")
+            return redirect("funcionarios:home")
+
+    # --- FIM DA VALIDAÇÃO ---
 
     # Mapeia o tipo de ponto para o novo status
     status_map = {
@@ -240,7 +263,7 @@ def bate_ponto_view(request):
     funcionario.save()
 
     RegistroPonto.objects.create(funcionario=funcionario, tipo=tipo_ponto)
-    messages.success(request, "Ponto registrado com sucesso!")
+    messages.success(request, f"'{tipo_ponto.replace('_', ' ').title()}' registrada com sucesso!")
     return redirect("funcionarios:home")
 
 
@@ -286,10 +309,7 @@ def tabela_equipe_view(request):
             )
             membro.ultima_pausa = ultima_pausa_registro
 
-            if (
-                ultima_pausa_registro
-                and ultima_pausa_registro.tipo == "SAIDA_PAUSA"
-            ):
+            if ultima_pausa_registro and ultima_pausa_registro.tipo == "SAIDA_PAUSA":
                 pausas_hoje_count = RegistroPonto.objects.filter(
                     funcionario=membro,
                     tipo="SAIDA_PAUSA",

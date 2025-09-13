@@ -8,22 +8,39 @@
     <div class="card-header fw-bold">
         Relógio de Ponto Virtual
     </div>
-    <div class="card-body">
-        <form action="{% url 'funcionarios:bate_ponto' %}" method="post">
-            {% csrf_token %}
-            <div class="input-group">
-                <select name="tipo_ponto" class="form-select" required>
-                    <option value="" disabled selected>Selecione o tipo de registro...</option>
-                    <option value="ENTRADA">Registrar Entrada</option>
-                    <option value="SAIDA_PAUSA">Sair para Pausa</option>
-                    <option value="VOLTA_PAUSA">Voltar da Pausa</option>
-                    <option value="SAIDA_ALMOCO">Sair para o Almoço</option>
-                    <option value="VOLTA_ALMOCO">Voltar do Almoço</option>
-                    <option value="SAIDA">Registrar Saída</option>
-                </select>
-                <button type="submit" class="btn btn-success">Bater Ponto Agora</button>
-            </div>
-        </form>
+    <div class="card-body text-center">
+        {% if funcionario_data.status_operacional == 'OFFLINE' %}
+            <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="tipo_ponto" value="ENTRADA">
+                <button type="submit" class="btn btn-primary btn-lg">Registrar Entrada</button>
+            </form>
+        {% elif funcionario_data.status_operacional == 'DISPONIVEL' %}
+            {% if proxima_pausa_regra %}
+                <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA">
+                    <button type="submit" class="btn btn-warning btn-lg">
+                        Iniciar Pausa ({{ proxima_pausa_regra.nome }} - {{ proxima_pausa_regra.duracao_minutos }} min)
+                    </button>
+                </form>
+            {% else %}
+                <p class="mb-0">Você já utilizou todas as suas pausas do dia.</p>
+            {% endif %}
+            <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="tipo_ponto" value="SAIDA">
+                <button type="submit" class="btn btn-danger btn-lg ms-2">Registrar Saída</button>
+            </form>
+        {% elif funcionario_data.status_operacional == 'EM_PAUSA' %}
+            <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="tipo_ponto" value="VOLTA_PAUSA">
+                <button type="submit" class="btn btn-success btn-lg">
+                    Voltar da Pausa <span class="badge bg-light text-dark pause-timer" data-pausestart="{{ ultima_pausa.timestamp.isoformat }}"></span>
+                </button>
+            </form>
+        {% endif %}
         <hr>
         <div class="mt-3">
             <p>
@@ -39,15 +56,6 @@
                     <span class="badge bg-secondary">{{ funcionario_data.get_status_operacional_display }}</span>
                 {% endif %}
             </p>
-            <p class="mb-1"><strong>Resumo de Pausas do Dia:</strong></p>
-            {% if regras_cargo %}
-                <ul class="list-unstyled">
-                    <li>Pausas Curtas Utilizadas: {{ pausas_hoje_count }} de {{ regras_cargo.max_pausas_diarias }}</li>
-                </ul>
-            {% else %}
-                <p><small>Regras de pausa não definidas (funcionário sem cargo).</small></p>
-            {% endif %}
-            <hr>
             <p class="mb-0">
                 <strong>Saldo do Banco de Horas:</strong>
                 <span class="{% if saldo_banco_horas_negativo %}text-danger{% else %}text-success{% endif %} fw-bold">
