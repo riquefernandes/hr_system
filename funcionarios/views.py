@@ -190,6 +190,22 @@ def bate_ponto_view(request):
         messages.error(request, "Você precisa selecionar um tipo de registro.")
         return redirect("funcionarios:home")
 
+    # --- VALIDAÇÃO DE ENTRADA/SAÍDA ÚNICA POR DIA ---
+    inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    if tipo_ponto == "ENTRADA":
+        if RegistroPonto.objects.filter(funcionario=funcionario, tipo='ENTRADA', timestamp__gte=inicio_do_dia).exists():
+            messages.error(request, "Você já registrou uma entrada hoje.")
+            return redirect("funcionarios:home")
+
+    if tipo_ponto == "SAIDA":
+        if not RegistroPonto.objects.filter(funcionario=funcionario, tipo='ENTRADA', timestamp__gte=inicio_do_dia).exists():
+            messages.error(request, "Você não pode registrar uma saída sem antes registrar uma entrada hoje.")
+            return redirect("funcionarios:home")
+        if RegistroPonto.objects.filter(funcionario=funcionario, tipo='SAIDA', timestamp__gte=inicio_do_dia).exists():
+            messages.error(request, "Você já registrou uma saída hoje.")
+            return redirect("funcionarios:home")
+
     # --- VALIDAÇÃO DE LÓGICA DE PONTO ---
 
     # Não pode bater ponto se estiver desligado, de férias, etc.
