@@ -21,3 +21,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 node_modules
+
+# Arquivos de mídia (uploads)
+media/

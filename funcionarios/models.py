@@ -283,6 +283,49 @@ class SolicitacaoAlteracaoBancaria(models.Model):
         return f"Solicitação Bancária de {self.funcionario.nome_completo}"
 
 
+class SolicitacaoAbono(models.Model):
+    STATUS_CHOICES = [
+        ("PENDENTE", "Pendente"),
+        ("APROVADO", "Aprovado"),
+        ("RECUSADO", "Recusado"),
+    ]
+    TIPO_ABONO_CHOICES = [
+        ("FALTA", "Abono de Falta"),
+        ("ATRASO", "Abono de Atraso/Horas"),
+    ]
+
+    funcionario = models.ForeignKey(
+        Funcionario, on_delete=models.CASCADE, related_name="solicitacoes_abono"
+    )
+    tipo_abono = models.CharField(max_length=10, choices=TIPO_ABONO_CHOICES)
+    data_inicio = models.DateTimeField(
+        help_text="Data e hora de início do período a ser abonado"
+    )
+    data_fim = models.DateTimeField(
+        help_text="Data e hora de fim do período a ser abonado"
+    )
+    motivo = models.TextField(max_length=500)
+    documento = models.FileField(upload_to="documentos_abono/", blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="PENDENTE")
+    analisado_por = models.ForeignKey(
+        Funcionario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="solicitacoes_abono_analisadas",
+    )
+    data_analise = models.DateTimeField(null=True, blank=True)
+    data_solicitacao = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-data_solicitacao"]
+        verbose_name = "Solicitação de Abono"
+        verbose_name_plural = "Solicitações de Abono"
+
+    def __str__(self):
+        return f"Solicitação de {self.funcionario.nome_completo} para {self.data_inicio.strftime('%d/%m/%Y')}"
+
+
 class RegistroPonto(models.Model):
     # ... (código sem alterações)
     TIPO_REGISTRO_CHOICES = [

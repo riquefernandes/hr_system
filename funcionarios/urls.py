@@ -9,6 +9,7 @@ urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("home/", views.home_view, name="home"),
     path("logout/", views.logout_view, name="logout"),
+    path("relatorio/", views.relatorio_folha_ponto, name="relatorio_folha_ponto"),
     # --- URL DE TROCA DE SENHA ATUALIZADA ---
     path(
         "password_change/",
@@ -37,6 +38,7 @@ urlpatterns = [
         views.solicitar_horario_view,
         name="solicitar_horario",
     ),
+    path("solicitar-abono/", views.solicitar_abono_view, name="solicitar_abono"),
     path(
         "solicitacao-horario/<int:pk>/aprovar/",
         views.aprovar_solicitacao_horario,
@@ -46,5 +48,15 @@ urlpatterns = [
         "solicitacao-horario/<int:pk>/recusar/",
         views.recusar_solicitacao_horario,
         name="recusar_solicitacao_horario",
+    ),
+    path(
+        "solicitacao-abono/<int:pk>/aprovar/",
+        views.aprovar_solicitacao_abono,
+        name="aprovar_solicitacao_abono",
+    ),
+    path(
+        "solicitacao-abono/<int:pk>/recusar/",
+        views.recusar_solicitacao_abono,
+        name="recusar_solicitacao_abono",
     ),
 ]

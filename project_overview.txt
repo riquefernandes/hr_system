@@ -26,116 +26,83 @@ O `hr_system` é uma aplicação web construída sobre o framework Django, segui
     -   **Templates:** Configurado para buscar templates no diretório `BASE_DIR / "templates"` e nos diretórios `templates/` de cada aplicação.
     -   **Banco de Dados (`DATABASES`):** Configurado para PostgreSQL, com credenciais obtidas de variáveis de ambiente, indicando um setup Docker.
     -   **Internacionalização:** Definido para `pt-br` (português do Brasil) e fuso horário `America/Sao_Paulo`, com suporte a internacionalização e fusos horários (`USE_I18N=True`, `USE_TZ=True`).
-    -   **Arquivos Estáticos:** Configuração padrão para servir arquivos estáticos.
+    -   **Arquivos Estáticos e de Mídia:** Configuração padrão para servir arquivos estáticos (`STATIC_URL`, `STATIC_ROOT`) e de uploads de usuários (`MEDIA_URL`, `MEDIA_ROOT`).
     -   **Autenticação:** `LOGIN_URL` aponta para a página de login customizada (`funcionarios:login`). `MESSAGE_TAGS` customizado para tags de mensagens do Bootstrap.
 
 -   `urls.py`:
     -   Define as rotas de nível superior do projeto.
     -   `path('admin/', admin.site.urls)`: Inclui as URLs do painel administrativo do Django.
     -   `path('', include('funcionarios.urls'))`: Inclui todas as URLs definidas na aplicação `funcionarios` na raiz do projeto.
+    -   Configurado para servir arquivos de mídia em ambiente de desenvolvimento.
 
 2.2. `funcionarios/` (Aplicação Principal)
 
 -   `models.py`: Define a estrutura de dados do sistema.
-    -   `Escala`: Define um padrão de horário de trabalho (nome, dias da semana, horário de entrada/saída, duração do almoço).
-    -   `Cargo`: Representa os cargos na empresa, com um CBO e uma `escala_padrao` (ForeignKey para `Escala`).
-    -   `RegraDePausa`: Define regras de pausas específicas para cada cargo (nome, ordem, duração em minutos).
-    -   `CentroDeCusto`: Representa os centros de custo.
-    -   `Banco`: Informações de bancos.
-    -   `Funcionario`: O modelo central, representando um funcionário. Possui campos para informações pessoais, contato, documentos, dados de trabalho (cargo, centro de custo, supervisor), dados bancários e status operacional. Relacionado a um `User` do Django.
-    -   `FuncionarioEscala`: Associa um `Funcionario` a uma `Escala` por um período específico, permitindo flexibilidade na atribuição de escalas.
-    -   `BancoDeHoras`: Registra o balanço de horas (créditos ou débitos) de um funcionário para um determinado dia, com descrição e data de processamento.
-    -   `SolicitacaoHorario`: Registra pedidos de funcionários para bater o ponto fora do horário, incluindo motivo, status (Pendente, Aprovado, Recusado) e informações de análise pelo supervisor.
-    -   `SolicitacaoAlteracaoEndereco`: Registra solicitações de funcionários para alterar dados de endereço.
-    -   `SolicitacaoAlteracaoBancaria`: Registra solicitações de funcionários para alterar dados bancários.
-    -   `RegistroPonto`: Registra os eventos de ponto (entrada, saída, pausas programadas e pessoais) de um funcionário.
+    -   `Escala`, `Cargo`, `RegraDePausa`, `CentroDeCusto`, `Banco`: Modelos de suporte para a estrutura organizacional.
+    -   `Funcionario`: O modelo central, representando um funcionário.
+    -   `FuncionarioEscala`: Associa um `Funcionario` a uma `Escala` por um período específico.
+    -   `BancoDeHoras`: Registra o balanço de horas (créditos ou débitos) de um funcionário.
+    -   `RegistroPonto`: Registra os eventos de ponto (entrada, saída, pausas).
+    -   `SolicitacaoHorario`: Registra pedidos de funcionários para bater o ponto fora do horário permitido.
+    -   `SolicitacaoAbono`: **(Novo)** Registra pedidos de funcionários para abonar faltas ou horas, com suporte a anexos.
+    -   `SolicitacaoAlteracaoEndereco`, `SolicitacaoAlteracaoBancaria`: Modelos para solicitações de alteração de dados cadastrais.
 
--   `views.py`: Contém a lógica de negócio e as funções que respondem às requisições HTTP.
-    -   `login_view`: Lida com a autenticação de usuários.
-    -   `CustomPasswordChangeView`: View customizada para a troca de senha, garantindo que a flag `deve_alterar_senha` seja desativada após a troca.
-    -   `supervisor_dashboard_view`: Exibe o dashboard para supervisores, mostrando a equipe e solicitações pendentes.
-    -   `home_view`: Dashboard pessoal do funcionário, exibindo dados cadastrais, status operacional, saldo do banco de horas e formulários de solicitação.
-    -   `bate_ponto_view`: Processa o registro de ponto (entrada, saída, pausas). Inclui validações de horário de entrada baseadas na escala e redireciona para `solicitar_horario_view` se o ponto for fora da janela permitida.
-    -   `solicitar_horario_view`: Permite que o funcionário envie uma solicitação para bater o ponto fora de hora, explicando o motivo.
-    -   `tabela_equipe_view`: View auxiliar para o dashboard do supervisor, retornando a tabela da equipe via HTMX.
-    -   `aprovar_solicitacao_horario`: Lógica para aprovar uma `SolicitacaoHorario` por um supervisor.
-    -   `recusar_solicitacao_horario`: Lógica para recusar uma `SolicitacaoHorario` por um supervisor.
-    -   `logout_view`: Lida com o logout de usuários.
+-   `views.py`: Contém a lógica de negócio.
+    -   `login_view`, `logout_view`, `CustomPasswordChangeView`: Views de autenticação e gestão de usuário.
+    -   `home_view`: Dashboard pessoal do funcionário.
+    -   `supervisor_dashboard_view`: Dashboard para supervisores.
+    -   `bate_ponto_view`: Processa o registro de ponto, com validações de status, horário e dia da semana.
+    -   `relatorio_folha_ponto`: **(Nova)** Gera um relatório de folha de ponto para um funcionário em um período, identificando faltas injustificadas.
+    -   `solicitar_horario_view`, `aprovar_solicitacao_horario`, `recusar_solicitacao_horario`: Fluxo de solicitação de ponto fora de hora.
+    -   `solicitar_abono_view`, `aprovar_solicitacao_abono`, `recusar_solicitacao_abono`: **(Novo)** Fluxo completo para solicitação e aprovação/recusa de abonos.
+    -   `tabela_equipe_view`: View auxiliar para o dashboard do supervisor (HTMX).
 
--   `urls.py`: Define as rotas específicas da aplicação `funcionarios`. Inclui rotas para login, home, dashboard do supervisor, registro de ponto, solicitações de alteração e as novas rotas para solicitação e aprovação/recusa de ponto fora de hora.
+-   `urls.py`: Define as rotas da aplicação, incluindo as novas rotas para relatórios (`/relatorio/`) e o fluxo de abonos (`/solicitar-abono/`, etc.).
 
--   `admin.py`: Customiza o painel administrativo do Django para os modelos da aplicação `funcionarios`.
-    -   `FuncionarioAdmin`: Configura a exibição e edição de funcionários, incluindo campos somente leitura, fieldsets e um inline para `FuncionarioEscala`.
-    -   `RegraDePausaInline`: Permite gerenciar regras de pausa diretamente na página de edição de `Cargo`.
-    -   `CargoAdmin`: Configura a exibição de cargos, incluindo o inline para regras de pausa.
-    -   `SolicitacaoAlteracaoEnderecoAdmin`, `SolicitacaoAlteracaoBancariaAdmin`: Configuram a exibição e ações para aprovação de solicitações de alteração cadastral.
-    -   `EscalaAdmin`: Configura a exibição e edição de `Escala`s.
-    -   `BancoDeHorasAdmin`: Configura a exibição de registros de `BancoDeHoras` como somente leitura.
-    -   `SolicitacaoHorarioAdmin`: Configura a exibição de `SolicitacaoHorario`s, também com campos somente leitura para análise.
+-   `forms.py`: Define os formulários da aplicação.
+    -   `RelatorioFolhaPontoForm`: **(Novo)** Formulário para filtrar o relatório de folha de ponto.
+    -   `SolicitacaoAbonoForm`: **(Novo)** Formulário para o funcionário solicitar um abono com anexo.
+    -   `SolicitacaoAlteracaoEnderecoForm`, `SolicitacaoAlteracaoBancariaForm`, `SolicitacaoHorarioForm`: Demais formulários de solicitação.
 
--   `forms.py`: Define os formulários utilizados na aplicação.
-    -   `SolicitacaoAlteracaoEnderecoForm`, `SolicitacaoAlteracaoBancariaForm`: Formulários para as respectivas solicitações de alteração.
-    -   `SolicitacaoHorarioForm`: Formulário para o funcionário solicitar ponto fora de hora.
+-   `management/commands/processar_pontos.py`: Comando de gerenciamento para processar os registros de ponto e popular o banco de horas.
 
--   `management/commands/processar_pontos.py`: Um comando de gerenciamento customizado do Django.
-    -   `Command`: Classe principal do comando.
-    -   `add_arguments`: Permite passar uma data específica como argumento.
-    -   `handle`: Método principal que orquestra o processamento.
-    -   `process_employee`: Lógica central que, para cada funcionário ativo, encontra sua escala, obtém os registros de ponto do dia, calcula a jornada líquida, compara com a carga horária esperada da escala e cria/atualiza um registro em `BancoDeHoras` com a diferença (crédito/débito).
-    -   `calculate_break_time`: Função auxiliar para calcular a duração total de pausas (café/almoço).
-    -   `get_description`: Função auxiliar para gerar uma descrição para o registro de `BancoDeHoras` (ex: "Atraso", "Horas extras").
-
--   `templates/`: Contém os arquivos HTML que definem a interface do usuário.
-    -   `funcionarios/home.html`: Dashboard do funcionário.
-    -   `funcionarios/supervisor_dashboard.html`: Dashboard do supervisor.
-    -   `funcionarios/_tabela_equipe.html`: Partial HTML para a tabela da equipe no dashboard do supervisor (carregado via HTMX).
-    -   `funcionarios/solicitar_horario.html`: Formulário para solicitação de ponto fora de hora.
-    -   `registration/password_change_form.html`, `registration/password_change_done.html`: Templates para o fluxo de troca de senha.
+-   `templates/`: Contém os arquivos HTML.
+    -   `funcionarios/home.html`, `funcionarios/supervisor_dashboard.html`: Dashboards principais.
+    -   `funcionarios/relatorio_folha_ponto.html`: **(Novo)** Template para exibir o relatório de ponto.
+    -   `funcionarios/solicitar_abono.html`: **(Novo)** Template com o formulário para solicitar abono.
+    -   Demais templates para login, troca de senha, etc.
 
 3. Lógica de Negócio e Fluxos Chave
 
-3.1. Gestão de Funcionários
--   **Cadastro:** Funcionários são cadastrados via painel administrativo, com criação automática de usuário de login e senha provisória.
--   **Informações Detalhadas:** Armazena dados pessoais, de contato, documentos, dados de trabalho e bancários.
--   **Status:** Controla o status geral (Ativo, Férias, Afastado, Desligado) e operacional (Disponível, Em Pausa, Offline).
+3.1. Gestão de Funcionários e Escalas
+-   Cadastro e gestão de dados de funcionários, cargos e escalas de trabalho.
 
 3.2. Registro de Ponto e Controle de Jornada
--   **Bater Ponto (Entrada/Saída/Pausas):** Funcionários registram seus eventos de ponto através de uma interface simples.
--   **Validação de Ponto Único:** O sistema impede que um funcionário registre a 'Entrada' ou a 'Saída' mais de uma vez no mesmo dia. Também previne o registro de 'Saída' antes de uma 'Entrada'.
--   **Pausa Pessoal:** Além das pausas programadas, o funcionário pode iniciar uma 'Pausa Pessoal' a qualquer momento. O início e o fim são registrados para futuros relatórios.
--   **Restrição de Entrada por Escala:** Ao tentar registrar a entrada, o sistema verifica se o horário está dentro de uma janela de tolerância (30 minutos antes a 60 minutos depois) do horário de entrada definido na escala do funcionário para aquele dia.
--   **Solicitação de Ponto Fora de Hora e Aprovação do Supervisor:**
-    -   Se o funcionário tentar bater o ponto de entrada fora da janela permitida e não tiver uma solicitação aprovada, ele é redirecionado para um formulário de `SolicitacaoHorario`.
-    -   O funcionário preenche o motivo e envia a solicitação.
-    -   Supervisores podem visualizar as solicitações pendentes de sua equipe em seu dashboard e aprová-las ou recusá-las.
-    -   Uma vez aprovada, o funcionário pode então registrar o ponto para aquele dia.
--   **Cálculo de Pausas:** O sistema calcula a duração das pausas (café e almoço) com base nos registros de ponto.
--   **Limites de Pausa:** Regras de pausas (quantidade e duração) são definidas por cargo e aplicadas, com alertas visuais para o supervisor quando excedidas.
+-   **Bater Ponto:** Funcionários registram entrada, saída e pausas.
+-   **Validações:** O sistema valida:
+    -   Unicidade de entrada/saída por dia.
+    -   Status do funcionário (deve estar 'ATIVO').
+    -   **Dia de Trabalho:** **(Corrigido)** Impede o registro de ponto em dias de folga, conforme a escala.
+    -   Janela de tolerância para o horário de entrada.
+-   **Solicitações:** Fluxos de aprovação/recusa para ponto fora de hora.
 
-3.3. Gestão de Escalas
--   **Definição de Escalas:** Administradores criam padrões de escalas com dias da semana, horários de entrada/saída e duração de almoço.
--   **Atribuição Flexível:** Escalas podem ser atribuídas como padrão a um cargo ou individualmente a um funcionário por um período, permitindo gerenciar turnos e mudanças de escala.
+3.3. Banco de Horas
+-   Um comando (`processar_pontos`) analisa os registros diários e calcula o saldo de horas (crédito/débito) de cada funcionário, salvando no `BancoDeHoras`.
 
-3.4. Banco de Horas
--   **Processamento Diário:** Um comando de gerenciamento (`processar_pontos`) é executado para calcular o saldo de horas de cada funcionário.
--   **Cálculo:** Compara a jornada de trabalho real (baseada nos registros de ponto, descontando pausas) com a carga horária esperada da escala.
--   **Registro:** A diferença (minutos positivos para horas extras, negativos para atrasos/saídas antecipadas) é registrada no `BancoDeHoras`.
--   **Visualização:** Funcionários podem ver seu saldo total de banco de horas em seu dashboard.
+3.4. Relatório de Folha de Ponto **(Nova Funcionalidade)**
+-   Usuários (funcionários e supervisores) podem gerar um relatório de ponto para um período específico.
+-   O relatório exibe as marcações de cada dia, o saldo do banco de horas e identifica **faltas injustificadas** (dias de trabalho sem registro de ponto).
 
-3.5. Solicitações de Alteração Cadastral
--   Funcionários podem solicitar alterações em seu endereço e dados bancários através de formulários dedicados.
--   Administradores aprovam ou recusam essas solicitações, que atualizam automaticamente os dados do funcionário.
-
-3.6. Visão do Supervisor
--   **Dashboard de Equipe:** Supervisores têm uma visão geral em tempo real do status operacional de sua equipe.
--   **Monitoramento de Pausas:** Cronômetros de pausa em tempo real com alertas visuais para pausas excedidas.
--   **Gestão de Solicitações:** Gerencia as solicitações de ponto fora de hora de sua equipe.
+3.5. Solicitação de Abono **(Nova Funcionalidade)**
+-   **Solicitação pelo Funcionário:** O funcionário pode preencher um formulário para solicitar o abono de uma falta ou de um período de horas, explicando o motivo e, opcionalmente, anexando um documento (ex: atestado médico).
+-   **Análise pelo Supervisor:** O supervisor visualiza as solicitações pendentes em seu dashboard, pode baixar o anexo e escolher "Aprovar" ou "Recusar".
+-   **Lógica de Aprovação:** Ao aprovar, o sistema cria automaticamente um registro de crédito no `BancoDeHoras` do funcionário, compensando o período solicitado.
 
 4. Tecnologias Utilizadas (Resumo)
 
 -   **Backend:** Python 3.11, Django 5.2
 -   **Banco de Dados:** PostgreSQL
--   **Frontend:** HTML5, CSS3, JavaScript (Vanilla), HTMX (para atualizações dinâmicas)
+-   **Frontend:** HTML5, CSS3, JavaScript (Vanilla), HTMX
 -   **Framework CSS:** Bootstrap 5
 -   **Ambiente:** Docker, Docker Compose
 -   **Bibliotecas Python Notáveis:** `psycopg2-binary`, `django-localflavor`.

@@ -10,13 +10,18 @@ from django.db.models import Sum, Q
 # Importações para trabalhar com data e hora
 from django.utils import timezone
 from datetime import timedelta, datetime
+from collections import defaultdict
+
 
 from .forms import (
+    RelatorioFolhaPontoForm,
+    SolicitacaoAbonoForm,
     SolicitacaoAlteracaoEnderecoForm,
     SolicitacaoAlteracaoBancariaForm,
     SolicitacaoHorarioForm,
 )
 from .models import (
+    SolicitacaoAbono,
     SolicitacaoAlteracaoEndereco,
     SolicitacaoAlteracaoBancaria,
     RegistroPonto,
@@ -63,13 +68,17 @@ def supervisor_dashboard_view(request):
     equipe_ids = supervisor_logado.equipe.values_list("id", flat=True)
 
     # Busca as solicitações pendentes dos funcionários da equipe
-    solicitacoes_pendentes = SolicitacaoHorario.objects.filter(
+    solicitacoes_horario_pendentes = SolicitacaoHorario.objects.filter(
+        funcionario_id__in=equipe_ids, status="PENDENTE"
+    )
+    solicitacoes_abono_pendentes = SolicitacaoAbono.objects.filter(
         funcionario_id__in=equipe_ids, status="PENDENTE"
     )
 
     context = {
         "supervisor": supervisor_logado,
-        "solicitacoes_pendentes": solicitacoes_pendentes,
+        "solicitacoes_horario_pendentes": solicitacoes_horario_pendentes,
+        "solicitacoes_abono_pendentes": solicitacoes_abono_pendentes,
     }
     return render(request, "funcionarios/supervisor_dashboard.html", context)
 
@@ -163,6 +172,9 @@ def home_view(request):
     solicitacoes_bancarias = SolicitacaoAlteracaoBancaria.objects.filter(
         funcionario=funcionario
     ).order_by("-data_solicitacao")
+    solicitacoes_abono = SolicitacaoAbono.objects.filter(
+        funcionario=funcionario
+    ).order_by("-data_solicitacao")
 
     context = {
         "funcionario_data": funcionario,
@@ -170,6 +182,7 @@ def home_view(request):
         "form_bancario": form_bancario,
         "solicitacoes_endereco": solicitacoes_endereco,
         "solicitacoes_bancarias": solicitacoes_bancarias,
+        "solicitacoes_abono": solicitacoes_abono,
         "proxima_pausa_regra": proxima_pausa_regra,  # Variável de contexto atualizada
         "ultima_pausa": ultima_pausa,
         "escala_atual": escala_atual,
@@ -194,15 +207,24 @@ def bate_ponto_view(request):
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
 
     if tipo_ponto == "ENTRADA":
-        if RegistroPonto.objects.filter(funcionario=funcionario, tipo='ENTRADA', timestamp__gte=inicio_do_dia).exists():
+        if RegistroPonto.objects.filter(
+            funcionario=funcionario, tipo="ENTRADA", timestamp__gte=inicio_do_dia
+        ).exists():
             messages.error(request, "Você já registrou uma entrada hoje.")
             return redirect("funcionarios:home")
 
     if tipo_ponto == "SAIDA":
-        if not RegistroPonto.objects.filter(funcionario=funcionario, tipo='ENTRADA', timestamp__gte=inicio_do_dia).exists():
-            messages.error(request, "Você não pode registrar uma saída sem antes registrar uma entrada hoje.")
+        if not RegistroPonto.objects.filter(
+            funcionario=funcionario, tipo="ENTRADA", timestamp__gte=inicio_do_dia
+        ).exists():
+            messages.error(
+                request,
+                "Você não pode registrar uma saída sem antes registrar uma entrada hoje.",
+            )
             return redirect("funcionarios:home")
-        if RegistroPonto.objects.filter(funcionario=funcionario, tipo='SAIDA', timestamp__gte=inicio_do_dia).exists():
+        if RegistroPonto.objects.filter(
+            funcionario=funcionario, tipo="SAIDA", timestamp__gte=inicio_do_dia
+        ).exists():
             messages.error(request, "Você já registrou uma saída hoje.")
             return redirect("funcionarios:home")
 
@@ -210,32 +232,53 @@ def bate_ponto_view(request):
 
     # Não pode bater ponto se estiver desligado, de férias, etc.
     if funcionario.status != "ATIVO":
-        messages.error(request, f"Seu status é '{funcionario.get_status_display()}', você não pode registrar o ponto.")
+        messages.error(
+            request,
+            f"Seu status é '{funcionario.get_status_display()}', você não pode registrar o ponto.",
+        )
         return redirect("funcionarios:home")
 
     # Validações de Entrada
     if tipo_ponto == "ENTRADA":
         if funcionario.status_operacional != "OFFLINE":
-            messages.error(request, f"Ação inválida. Seu status atual é '{funcionario.get_status_operacional_display()}'.")
+            messages.error(
+                request,
+                f"Ação inválida. Seu status atual é '{funcionario.get_status_operacional_display()}'.",
+            )
             return redirect("funcionarios:home")
-        
+
         data_local = timezone.localtime(agora).date()
         solicitacao_aprovada = SolicitacaoHorario.objects.filter(
             funcionario=funcionario, status="APROVADO", data_hora_ponto__date=data_local
         ).exists()
         if not solicitacao_aprovada:
-            escala_atual = FuncionarioEscala.objects.filter(
-                funcionario=funcionario, data_inicio__lte=data_local
-            ).filter(Q(data_fim__gte=data_local) | Q(data_fim__isnull=True)).first()
+            escala_atual = (
+                FuncionarioEscala.objects.filter(
+                    funcionario=funcionario, data_inicio__lte=data_local
+                )
+                .filter(Q(data_fim__gte=data_local) | Q(data_fim__isnull=True))
+                .first()
+            )
             if not escala_atual:
-                messages.error(request, "Você não tem uma escala de trabalho definida. Contate o RH.")
+                messages.error(
+                    request, "Você não tem uma escala de trabalho definida. Contate o RH."
+                )
                 return redirect("funcionarios:home")
+
+            # Validação para não bater ponto em dia de folga
+            dia_da_semana = data_local.weekday()  # Segunda = 0, Domingo = 6
+            if str(dia_da_semana) not in escala_atual.escala.dias_semana.split(","):
+                messages.error(request, "Você não pode registrar o ponto em um dia de folga.")
+                return redirect("funcionarios:home")
+
             # ... (resto da lógica de janela de horário)
 
     # Validações de Pausa
     if tipo_ponto == "SAIDA_PAUSA":
         if funcionario.status_operacional != "DISPONIVEL":
-            messages.error(request, f"Você só pode iniciar uma pausa se estiver 'Disponível'.")
+            messages.error(
+                request, f"Você só pode iniciar uma pausa se estiver 'Disponível'."
+            )
             return redirect("funcionarios:home")
 
         # Validação da regra de pausa sequencial
@@ -243,28 +286,38 @@ def bate_ponto_view(request):
         pausas_hoje_count = RegistroPonto.objects.filter(
             funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__gte=inicio_do_dia
         ).count()
-        
+
         try:
             # Apenas verifica se a próxima regra existe. Não precisa usar a variável.
             RegraDePausa.objects.get(cargo=funcionario.cargo, ordem=pausas_hoje_count + 1)
         except RegraDePausa.DoesNotExist:
-            messages.error(request, "Você não tem mais pausas disponíveis ou elas não estão configuradas para seu cargo.")
+            messages.error(
+                request,
+                "Você não tem mais pausas disponíveis ou elas não estão configuradas para seu cargo.",
+            )
             return redirect("funcionarios:home")
 
     if tipo_ponto == "SAIDA_PAUSA_PESSOAL":
         if funcionario.status_operacional != "DISPONIVEL":
-            messages.error(request, f"Você só pode iniciar uma pausa pessoal se estiver 'Disponível'.")
+            messages.error(
+                request, f"Você só pode iniciar uma pausa pessoal se estiver 'Disponível'."
+            )
             return redirect("funcionarios:home")
 
     if tipo_ponto in ["VOLTA_PAUSA", "VOLTA_PAUSA_PESSOAL"]:
         if funcionario.status_operacional != "EM_PAUSA":
-            messages.error(request, f"Você só pode voltar de uma pausa se estiver 'Em Pausa'.")
+            messages.error(
+                request, f"Você só pode voltar de uma pausa se estiver 'Em Pausa'."
+            )
             return redirect("funcionarios:home")
 
     # Validações de Saída
     if tipo_ponto == "SAIDA":
         if funcionario.status_operacional not in ["DISPONIVEL", "EM_PAUSA"]:
-            messages.error(request, f"Você não pode registrar a saída com o status '{funcionario.get_status_operacional_display()}'.")
+            messages.error(
+                request,
+                f"Você não pode registrar a saída com o status '{funcionario.get_status_operacional_display()}'.",
+            )
             return redirect("funcionarios:home")
 
     # --- FIM DA VALIDAÇÃO ---
@@ -286,7 +339,9 @@ def bate_ponto_view(request):
     funcionario.save()
 
     RegistroPonto.objects.create(funcionario=funcionario, tipo=tipo_ponto)
-    messages.success(request, f"'{tipo_ponto.replace('_', ' ').title()}' registrada com sucesso!")
+    messages.success(
+        request, f"'{tipo_ponto.replace('_', ' ').title()}' registrada com sucesso!"
+    )
     return redirect("funcionarios:home")
 
 
@@ -308,6 +363,25 @@ def solicitar_horario_view(request):
 
     context = {"form": form}
     return render(request, "funcionarios/solicitar_horario.html", context)
+
+
+@login_required
+def solicitar_abono_view(request):
+    if request.method == "POST":
+        form = SolicitacaoAbonoForm(request.POST, request.FILES)
+        if form.is_valid():
+            solicitacao = form.save(commit=False)
+            solicitacao.funcionario = request.user.funcionario
+            solicitacao.save()
+            messages.success(
+                request, "Sua solicitação de abono foi enviada para análise."
+            )
+            return redirect("funcionarios:home")
+    else:
+        form = SolicitacaoAbonoForm()
+
+    context = {"form": form}
+    return render(request, "funcionarios/solicitar_abono.html", context)
 
 
 # --- NOVA VIEW PARA SERVIR A TABELA VIA HTMX ---
@@ -355,6 +429,83 @@ def tabela_equipe_view(request):
     return render(request, "funcionarios/_tabela_equipe.html", {"equipe": equipe})
 
 
+@login_required
+def relatorio_folha_ponto(request):
+    form = RelatorioFolhaPontoForm(user=request.user)
+    relatorio_data = None
+
+    if request.method == "POST":
+        form = RelatorioFolhaPontoForm(request.POST, user=request.user)
+        if form.is_valid():
+            data_inicio = form.cleaned_data["data_inicio"]
+            data_fim = form.cleaned_data["data_fim"]
+            funcionario = form.cleaned_data["funcionario"]
+
+            # Garante que a data de fim inclua o dia inteiro
+            data_fim_ajustada = datetime.combine(data_fim, datetime.max.time())
+
+            registros = (
+                RegistroPonto.objects.filter(
+                    funcionario=funcionario,
+                    timestamp__range=(data_inicio, data_fim_ajustada),
+                )
+                .order_by("timestamp")
+                .select_related("funcionario")
+            )
+
+            banco_horas = BancoDeHoras.objects.filter(
+                funcionario=funcionario, data__range=(data_inicio, data_fim)
+            )
+
+            # Agrupa registros por dia
+            registros_por_dia = defaultdict(list)
+            for registro in registros:
+                dia = registro.timestamp.date()
+                registros_por_dia[dia].append(registro)
+
+            # Mapeia o saldo do banco de horas por dia
+            banco_por_dia = {bh.data: bh for bh in banco_horas}
+
+            # Monta a estrutura final do relatório
+            relatorio_data = []
+            dias_no_periodo = (data_fim - data_inicio).days + 1
+            for dia_offset in range(dias_no_periodo):
+                data_atual = data_inicio + timedelta(days=dia_offset)
+                saldo_bh = banco_por_dia.get(data_atual)
+                registros_do_dia = registros_por_dia.get(data_atual, [])
+
+                status_dia = ""
+                # Lógica para identificar falta injustificada
+                escala_info = (
+                    FuncionarioEscala.objects.filter(
+                        funcionario=funcionario, data_inicio__lte=data_atual
+                    )
+                    .filter(Q(data_fim__gte=data_atual) | Q(data_fim__isnull=True))
+                    .first()
+                )
+
+                is_workday = False
+                if escala_info:
+                    dia_da_semana = data_atual.weekday()  # Segunda = 0, Domingo = 6
+                    if str(dia_da_semana) in escala_info.escala.dias_semana.split(","):
+                        is_workday = True
+
+                if is_workday and not registros_do_dia and not saldo_bh:
+                    status_dia = "Falta Injustificada"
+
+                relatorio_data.append(
+                    {
+                        "data": data_atual,
+                        "registros": registros_do_dia,
+                        "saldo_bh": saldo_bh,
+                        "status": status_dia,
+                    }
+                )
+
+    context = {"form": form, "relatorio": relatorio_data}
+    return render(request, "funcionarios/relatorio_folha_ponto.html", context)
+
+
 def logout_view(request):
     logout(request)
     return redirect("funcionarios:login")
@@ -390,6 +541,52 @@ def recusar_solicitacao_horario(request, pk):
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
         messages.success(request, "A solicitação foi recusada.")
+    else:
+        messages.error(request, "Você não tem permissão para recusar esta solicitação.")
+
+    return redirect("funcionarios:supervisor_dashboard")
+
+
+@login_required
+def aprovar_solicitacao_abono(request, pk):
+    solicitacao = get_object_or_404(SolicitacaoAbono, pk=pk)
+    supervisor = request.user.funcionario
+
+    if solicitacao.funcionario.supervisor == supervisor:
+        solicitacao.status = "APROVADO"
+        solicitacao.analisado_por = supervisor
+        solicitacao.data_analise = timezone.now()
+        solicitacao.save()
+
+        # Lógica para criar o registro no banco de horas
+        minutos_abonados = (solicitacao.data_fim - solicitacao.data_inicio).total_seconds() / 60
+
+        if minutos_abonados > 0:
+            BancoDeHoras.objects.create(
+                funcionario=solicitacao.funcionario,
+                data=solicitacao.data_inicio.date(),
+                minutos=minutos_abonados,
+                descricao=f"Abono aprovado: {solicitacao.motivo}",
+            )
+
+        messages.success(request, "A solicitação de abono foi aprovada.")
+    else:
+        messages.error(request, "Você não tem permissão para aprovar esta solicitação.")
+
+    return redirect("funcionarios:supervisor_dashboard")
+
+
+@login_required
+def recusar_solicitacao_abono(request, pk):
+    solicitacao = get_object_or_404(SolicitacaoAbono, pk=pk)
+    supervisor = request.user.funcionario
+
+    if solicitacao.funcionario.supervisor == supervisor:
+        solicitacao.status = "RECUSADO"
+        solicitacao.analisado_por = supervisor
+        solicitacao.data_analise = timezone.now()
+        solicitacao.save()
+        messages.success(request, "A solicitação de abono foi recusada.")
     else:
         messages.error(request, "Você não tem permissão para recusar esta solicitação.")
 

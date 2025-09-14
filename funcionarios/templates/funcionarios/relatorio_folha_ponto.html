@@ -1,0 +1,85 @@
+{% extends "funcionarios/base.html" %}
+
+{% block title %}Relatório de Folha de Ponto{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <h2 class="mb-4">Relatório de Folha de Ponto</h2>
+            <div class="card">
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="row align-items-end">
+                            <div class="col-md-4">{{ form.data_inicio.label_tag }} {{ form.data_inicio }}</div>
+                            <div class="col-md-4">{{ form.data_fim.label_tag }} {{ form.data_fim }}</div>
+                            {% if form.funcionario.field.queryset.count > 1 %}
+                            <div class="col-md-4">{{ form.funcionario.label_tag }} {{ form.funcionario }}</div>
+                            {% else %}
+                                {{ form.funcionario }}
+                            {% endif %}
+                            <div class="col-md-2"><button type="submit" class="btn btn-primary w-100">Gerar</button></div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if relatorio %}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Período de {{ form.cleaned_data.data_inicio|date:"d/m/Y" }} a {{ form.cleaned_data.data_fim|date:"d/m/Y" }}</h4>
+                    <h5>Funcionário: {{ form.cleaned_data.funcionario.nome_completo }}</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Data</th>
+                                <th>Marcações</th>
+                                <th>Saldo do Dia (Banco de Horas)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for dia in relatorio %}
+                            <tr class="{% if dia.status == 'Falta Injustificada' %}table-danger{% endif %}">
+                                <td>{{ dia.data|date:"d/m/Y" }} ({{ dia.data|date:"l" }})</td>
+                                
+                                {% if dia.status == 'Falta Injustificada' %}
+                                    <td colspan="2" class="text-center fw-bold">
+                                        {{ dia.status }}
+                                    </td>
+                                {% else %}
+                                    <td>
+                                        {% for registro in dia.registros %}
+                                            <span class="badge bg-secondary">{{ registro.get_tipo_display }}: {{ registro.timestamp|date:"H:i:s" }}</span><br>
+                                        {% empty %}
+                                            <span class="text-muted">Sem registros</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if dia.saldo_bh %}
+                                            <span class="{% if dia.saldo_bh.minutos < 0 %}text-danger{% else %}text-success{% endif %}">
+                                                {{ dia.saldo_bh.minutos }} minutos
+                                            </span>
+                                            <small class="text-muted">({{ dia.saldo_bh.descricao }})</small>
+                                        {% else %}
+                                            <span class="text-muted">Não processado</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

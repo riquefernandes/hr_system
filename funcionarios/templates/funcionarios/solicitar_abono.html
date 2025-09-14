@@ -1,0 +1,55 @@
+{% extends "funcionarios/base.html" %}
+
+{% block title %}Solicitar Abono{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="mb-0">Solicitação de Abono de Faltas ou Horas</h2>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">Preencha o formulário abaixo para solicitar o abono de uma falta ou de um período de horas (atrasos, saídas antecipadas, etc). Anexe um documento comprobatório, se necessário.</p>
+                    <hr>
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            {{ form.tipo_abono.label_tag }}
+                            {{ form.tipo_abono }}
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                {{ form.data_inicio.label_tag }}
+                                {{ form.data_inicio }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                {{ form.data_fim.label_tag }}
+                                {{ form.data_fim }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.motivo.label_tag }}
+                            {{ form.motivo }}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.documento.label_tag }}
+                            {{ form.documento }}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary">Enviar Solicitação</button>
+                            <a href="{% url 'funcionarios:home' %}" class="btn btn-secondary">Cancelar</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -144,3 +144,7 @@ MESSAGE_TAGS = {
 }
 
 ALLOWED_HOSTS = ["*"]
+
+# Configuração de arquivos de mídia (uploads de usuários)
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"

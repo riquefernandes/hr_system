@@ -93,6 +93,14 @@
     </div>
 </div>
 
+<div class="card mb-4">
+    <div class="card-body">
+        <div class="d-grid gap-2">
+            <a href="{% url 'funcionarios:relatorio_folha_ponto' %}" class="btn btn-outline-primary">Acessar Relatório de Folha de Ponto</a>
+            <a href="{% url 'funcionarios:solicitar_abono' %}" class="btn btn-outline-info">Solicitar Abono de Falta/Horas</a>
+        </div>
+    </div>
+</div>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h1 class="h2">Seus Dados Cadastrais</h1>
@@ -217,6 +225,24 @@
         </ul>
         {% else %}
         <p>Você ainda não fez nenhuma solicitação bancária.</p>
+        {% endif %}
+    </div>
+    <div class="col-md-12 mt-3">
+        <h4>Solicitações de Abono</h4>
+        {% if solicitacoes_abono %}
+        <ul class="list-group">
+            {% for s in solicitacoes_abono %}
+            <li class="list-group-item">
+                {{ s.data_solicitacao|date:"d/m/Y" }}: {{ s.get_tipo_abono_display }} de {{ s.data_inicio|date:"d/m/Y H:i" }} até {{ s.data_fim|date:"d/m/Y H:i" }} -
+                <span class="fw-bold">Status: {{ s.get_status_display }}</span>
+                {% if s.documento %}
+                    <a href="{{ s.documento.url }}" target="_blank" class="small">(Ver Anexo)</a>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>Você ainda não fez nenhuma solicitação de abono.</p>
         {% endif %}
     </div>
 </div>
