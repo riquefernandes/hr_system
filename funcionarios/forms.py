@@ -2,11 +2,14 @@
 from django import forms
 from .models import (
     Funcionario,
+    FuncionarioEscala,
     SolicitacaoAbono,
     SolicitacaoAlteracaoEndereco,
     SolicitacaoAlteracaoBancaria,
     SolicitacaoHorario,
 )
+from django.db.models import Q
+from datetime import datetime, time
 
 
 class DateInput(forms.DateInput):
@@ -18,21 +21,91 @@ class DateTimeInput(forms.DateTimeInput):
 
 
 class SolicitacaoAbonoForm(forms.ModelForm):
+    data_falta = forms.DateField(
+        label="Data da Falta", required=False, widget=DateInput
+    )
+    data_inicio_horas = forms.DateTimeField(
+        label="Início do Período", required=False, widget=DateTimeInput
+    )
+    data_fim_horas = forms.DateTimeField(
+        label="Fim do Período", required=False, widget=DateTimeInput
+    )
+
     class Meta:
         model = SolicitacaoAbono
-        fields = ["tipo_abono", "data_inicio", "data_fim", "motivo", "documento"]
+        fields = ["tipo_abono", "motivo", "documento"]
         widgets = {
-            "data_inicio": DateTimeInput(),
-            "data_fim": DateTimeInput(),
             "motivo": forms.Textarea(attrs={"rows": 3}),
         }
         labels = {
             "tipo_abono": "Tipo de Abono",
-            "data_inicio": "Início do Período para Abono",
-            "data_fim": "Fim do Período para Abono",
             "motivo": "Motivo da Solicitação",
             "documento": "Anexar Documento (Opcional)",
         }
+
+    def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        tipo_abono = cleaned_data.get("tipo_abono")
+        data_falta = cleaned_data.get("data_falta")
+        data_inicio_horas = cleaned_data.get("data_inicio_horas")
+        data_fim_horas = cleaned_data.get("data_fim_horas")
+
+        data_para_validar = None
+
+        if tipo_abono == "FALTA":
+            if not data_falta:
+                self.add_error("data_falta", "Este campo é obrigatório para abono de falta.")
+            else:
+                # Converte para datetime para salvar no modelo
+                cleaned_data["data_inicio"] = datetime.combine(data_falta, time.min)
+                cleaned_data["data_fim"] = datetime.combine(data_falta, time.max)
+                data_para_validar = data_falta
+
+        elif tipo_abono == "ATRASO":
+            if not data_inicio_horas or not data_fim_horas:
+                self.add_error(
+                    "data_inicio_horas",
+                    "Os campos de início e fim do período são obrigatórios.",
+                )
+            else:
+                if data_fim_horas <= data_inicio_horas:
+                    self.add_error(
+                        "data_fim_horas", "A data/hora final deve ser após a inicial."
+                    )
+                cleaned_data["data_inicio"] = data_inicio_horas
+                cleaned_data["data_fim"] = data_fim_horas
+                data_para_validar = data_inicio_horas.date()
+
+        # Validação do dia de trabalho
+        if data_para_validar and self.request:
+            funcionario = self.request.user.funcionario
+            escala_info = (
+                FuncionarioEscala.objects.filter(
+                    funcionario=funcionario, data_inicio__lte=data_para_validar
+                )
+                .filter(
+                    Q(data_fim__gte=data_para_validar) | Q(data_fim__isnull=True)
+                )
+                .first()
+            )
+
+            is_workday = False
+            if escala_info:
+                dia_da_semana = data_para_validar.weekday()
+                if str(dia_da_semana) in escala_info.escala.dias_semana.split(","):
+                    is_workday = True
+
+            if not is_workday:
+                self.add_error(
+                    None,  # Erro não associado a um campo específico
+                    f"A data {data_para_validar.strftime('%d/%m/%Y')} não é um dia de trabalho na sua escala.",
+                )
+
+        return cleaned_data
 
 
 class RelatorioFolhaPontoForm(forms.Form):

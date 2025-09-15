@@ -6,7 +6,24 @@
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8">
-            <div class="card">
+
+            {% if faltas %}
+            <div class="card mb-4">
+                <div class="card-header fw-bold text-white bg-warning">
+                    Faltas Recentes a Justificar
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for falta in faltas %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>Falta no dia: <strong>{{ falta|date:"d/m/Y" }}</strong> ({{ falta|date:"l" }})</span>
+                        <button class="btn btn-sm btn-primary btn-justificar" data-date="{{ falta|date:'Y-m-d' }}">Justificar este dia</button>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            <div class="card" id="form-card">
                 <div class="card-header">
                     <h2 class="mb-0">Solicitação de Abono de Faltas ou Horas</h2>
                 </div>
@@ -15,30 +32,46 @@
                     <hr>
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
                         
                         <div class="mb-3">
-                            {{ form.tipo_abono.label_tag }}
+                            <label for="{{ form.tipo_abono.id_for_label }}" class="form-label">{{ form.tipo_abono.label }}</label>
                             {{ form.tipo_abono }}
                         </div>
-                        
-                        <div class="row">
+
+                        <div id="div_data_falta" class="mb-3">
+                            <label for="{{ form.data_falta.id_for_label }}" class="form-label">{{ form.data_falta.label }}</label>
+                            {{ form.data_falta }}
+                            {% if form.data_falta.errors %}<div class="invalid-feedback d-block">{{ form.data_falta.errors.as_text }}</div>{% endif %}
+                        </div>
+
+                        <div id="div_data_horas" class="row">
                             <div class="col-md-6 mb-3">
-                                {{ form.data_inicio.label_tag }}
-                                {{ form.data_inicio }}
+                                <label for="{{ form.data_inicio_horas.id_for_label }}" class="form-label">{{ form.data_inicio_horas.label }}</label>
+                                {{ form.data_inicio_horas }}
+                                {% if form.data_inicio_horas.errors %}<div class="invalid-feedback d-block">{{ form.data_inicio_horas.errors.as_text }}</div>{% endif %}
                             </div>
                             <div class="col-md-6 mb-3">
-                                {{ form.data_fim.label_tag }}
-                                {{ form.data_fim }}
+                                <label for="{{ form.data_fim_horas.id_for_label }}" class="form-label">{{ form.data_fim_horas.label }}</label>
+                                {{ form.data_fim_horas }}
+                                {% if form.data_fim_horas.errors %}<div class="invalid-feedback d-block">{{ form.data_fim_horas.errors.as_text }}</div>{% endif %}
                             </div>
                         </div>
 
                         <div class="mb-3">
-                            {{ form.motivo.label_tag }}
+                            <label for="{{ form.motivo.id_for_label }}" class="form-label">{{ form.motivo.label }}</label>
                             {{ form.motivo }}
                         </div>
 
                         <div class="mb-3">
-                            {{ form.documento.label_tag }}
+                            <label for="{{ form.documento.id_for_label }}" class="form-label">{{ form.documento.label }}</label>
                             {{ form.documento }}
                         </div>
 
@@ -52,4 +85,54 @@
         </div>
     </div>
 </div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const tipoAbono = document.getElementById('{{ form.tipo_abono.id_for_label }}');
+    const divDataFalta = document.getElementById('div_data_falta');
+    const divDataHoras = document.getElementById('div_data_horas');
+    const dataFaltaInput = document.getElementById('{{ form.data_falta.id_for_label }}');
+    const formCard = document.getElementById('form-card');
+
+    function toggleFields() {
+        if (tipoAbono.value === 'FALTA') {
+            divDataFalta.style.display = 'block';
+            divDataHoras.style.display = 'none';
+        } else if (tipoAbono.value === 'ATRASO') {
+            divDataFalta.style.display = 'none';
+            divDataHoras.style.display = 'flex'; // Usando flex para manter o layout em linha
+        } else {
+            divDataFalta.style.display = 'none';
+            divDataHoras.style.display = 'none';
+        }
+    }
+
+    // Executa na carga da página
+    toggleFields();
+
+    // Adiciona o listener para mudanças no tipo de abono
+    tipoAbono.addEventListener('change', toggleFields);
+
+    // Adiciona listeners para os botões de justificar
+    document.querySelectorAll('.btn-justificar').forEach(button => {
+        button.addEventListener('click', function() {
+            const dateToSet = this.dataset.date;
+            
+            // Define o tipo de abono para FALTA
+            tipoAbono.value = 'FALTA';
+            
+            // Dispara o evento change para o JS acima atualizar a visibilidade dos campos
+            tipoAbono.dispatchEvent(new Event('change'));
+
+            // Define a data no campo de data da falta
+            dataFaltaInput.value = dateToSet;
+
+            // Rola a tela até o formulário
+            formCard.scrollIntoView({ behavior: 'smooth' });
+        });
+    });
+});
+</script>
+{% endblock %}
 {% endblock %}

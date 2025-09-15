@@ -367,20 +367,70 @@ def solicitar_horario_view(request):
 
 @login_required
 def solicitar_abono_view(request):
+    funcionario = request.user.funcionario
+    hoje = timezone.now().date()
+    # A busca começa no máximo 30 dias atrás, ou na data de contratação.
+    data_inicio_busca = max(hoje - timedelta(days=30), funcionario.data_contratacao)
+
+    # Otimiza a busca por registros de ponto e abonos já solicitados
+    datas_com_registro = set(
+        RegistroPonto.objects.filter(
+            funcionario=funcionario, timestamp__date__gte=data_inicio_busca
+        ).values_list("timestamp__date", flat=True)
+    )
+    datas_com_abono_pendente = set(
+        SolicitacaoAbono.objects.filter(
+            funcionario=funcionario,
+            data_inicio__date__gte=data_inicio_busca,
+            status="PENDENTE",
+        ).values_list("data_inicio__date", flat=True)
+    )
+
+    faltas_nao_justificadas = []
+    dias_a_verificar = (hoje - data_inicio_busca).days
+
+    for i in range(dias_a_verificar + 1):
+        data_atual = data_inicio_busca + timedelta(days=i)
+
+        # Pula se já existe registro de ponto ou abono pendente para o dia
+        if (
+            data_atual in datas_com_registro
+            or data_atual in datas_com_abono_pendente
+        ):
+            continue
+
+        # Encontra a escala específica para o dia que está sendo verificado
+        escala_do_dia = (
+            FuncionarioEscala.objects.filter(
+                funcionario=funcionario, data_inicio__lte=data_atual
+            )
+            .filter(Q(data_fim__gte=data_atual) | Q(data_fim__isnull=True))
+            .first()
+        )
+
+        if not escala_do_dia:
+            continue  # Se não tinha escala no dia, não é uma falta
+
+        dias_de_trabalho = [int(d) for d in escala_do_dia.escala.dias_semana.split(",")]
+        if data_atual.weekday() in dias_de_trabalho:
+            faltas_nao_justificadas.append(data_atual)
+
     if request.method == "POST":
-        form = SolicitacaoAbonoForm(request.POST, request.FILES)
+        form = SolicitacaoAbonoForm(request.POST, request.FILES, request=request)
         if form.is_valid():
             solicitacao = form.save(commit=False)
             solicitacao.funcionario = request.user.funcionario
+            solicitacao.data_inicio = form.cleaned_data["data_inicio"]
+            solicitacao.data_fim = form.cleaned_data["data_fim"]
             solicitacao.save()
             messages.success(
                 request, "Sua solicitação de abono foi enviada para análise."
             )
             return redirect("funcionarios:home")
     else:
-        form = SolicitacaoAbonoForm()
+        form = SolicitacaoAbonoForm(request=request)
 
-    context = {"form": form}
+    context = {"form": form, "faltas": faltas_nao_justificadas}
     return render(request, "funcionarios/solicitar_abono.html", context)
 
 
