@@ -59,7 +59,7 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
 ### Passos para Instalação
 1. Clone o repositório:
    ```bash
-   git clone <URL_DO_SEU_REPOSITORIO>
+   git clone https://github.com/riquefernandes/hr_system.git
    cd hr_system
    ```
 2. Construa e suba os containers Docker em modo "detached" (background):
