@@ -137,6 +137,8 @@ def home_view(request):
             proxima_pausa_regra = None  # Não há mais pausas disponíveis
 
     ultima_pausa = None
+    hora_fim_pausa = None  # Variável para o countdown
+
     if funcionario.status_operacional == "EM_PAUSA":
         ultima_pausa = (
             RegistroPonto.objects.filter(
@@ -147,6 +149,19 @@ def home_view(request):
             .order_by("-timestamp")
             .first()
         )
+
+        # Lógica para calcular o fim da pausa para o countdown
+        if ultima_pausa and ultima_pausa.tipo == "SAIDA_PAUSA" and funcionario.cargo:
+            # O pausas_hoje_count já nos diz qual é a ordem da pausa atual
+            try:
+                regra_pausa_atual = RegraDePausa.objects.get(
+                    cargo=funcionario.cargo, ordem=pausas_hoje_count
+                )
+                hora_fim_pausa = ultima_pausa.timestamp + timedelta(
+                    minutes=regra_pausa_atual.duracao_minutos
+                )
+            except RegraDePausa.DoesNotExist:
+                pass  # Se não encontrar regra, não haverá countdown
 
     # Lógica de Escala e Banco de Horas
     escala_atual = (
@@ -207,6 +222,7 @@ def home_view(request):
         "solicitacoes_abono": solicitacoes_abono,
         "proxima_pausa_regra": proxima_pausa_regra,
         "ultima_pausa": ultima_pausa,
+        "hora_fim_pausa": hora_fim_pausa.isoformat() if hora_fim_pausa else None,
         "escala_atual": escala_atual,
         "dias_de_trabalho": dias_de_trabalho,
         "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",

@@ -57,6 +57,9 @@
                     {% if ultima_pausa %}
                     <span class="text-muted small pause-timer" data-pausestart="{{ ultima_pausa.timestamp.isoformat }}"></span>
                     {% endif %}
+                    {% if hora_fim_pausa %}
+                    <span id="break-countdown" class="badge bg-danger ms-2" data-break-end-time="{{ hora_fim_pausa }}"></span>
+                    {% endif %}
                 {% else %}
                     <span class="badge bg-secondary">{{ funcionario_data.get_status_operacional_display }}</span>
                 {% endif %}
@@ -347,6 +350,32 @@
         updateLoggedInTimer();
         setInterval(updatePauseTimers, 1000);
         setInterval(updateLoggedInTimer, 1000);
+
+        // --- Lógica do Countdown da Pausa Programada ---
+        function updateBreakCountdown() {
+            const countdownElement = document.getElementById('break-countdown');
+            if (!countdownElement || !countdownElement.dataset.breakEndTime) return;
+
+            const endTime = new Date(countdownElement.dataset.breakEndTime);
+            const now = new Date();
+            const diff = endTime - now;
+
+            if (isNaN(diff) || diff < 0) {
+                countdownElement.textContent = 'Tempo Esgotado!';
+                countdownElement.classList.remove('bg-danger');
+                countdownElement.classList.add('bg-success');
+                return;
+            }
+
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+            const pad = (num) => num.toString().padStart(2, '0');
+            countdownElement.textContent = `Fim em: ${pad(minutes)}:${pad(seconds)}`;
+        }
+
+        updateBreakCountdown();
+        setInterval(updateBreakCountdown, 1000);
     });
 </script>
 
