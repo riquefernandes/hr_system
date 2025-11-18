@@ -2,7 +2,7 @@
 
 ## Descrição
 
-**hr_system** é uma aplicação web desenvolvida em Django para a administração de funcionários de um contact center. O sistema evoluiu para incluir um robusto controle de jornada de trabalho, com registro de ponto, gerenciamento de escalas, banco de horas e dashboards para supervisores.
+**hr_system** é uma aplicação web desenvolvida em Django para a administração de funcionários de um contact center. O sistema evoluiu para incluir um robusto controle de jornada de trabalho, com registro de ponto, gerenciamento de escalas, banco de horas, relatórios e dashboards para supervisores.
 
 A aplicação é totalmente containerizada com Docker, garantindo um ambiente de desenvolvimento e produção consistente e isolado.
 
@@ -38,9 +38,12 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
     - A tabela da equipe é atualizada automaticamente a cada 15 segundos (via HTMX).
     - **Cronômetro de Pausa:** Exibe há quanto tempo um funcionário está em pausa.
     - **Alerta de Limite de Pausa:** O cronômetro fica vermelho e em negrito se o funcionário exceder o tempo limite para aquela pausa específica.
+- **Relatório de Equipe (`/relatorio/equipe`):**
+    - Permite que o supervisor gere um relatório consolidado para sua equipe dentro de um período de datas.
+    - O relatório exibe o total de horas extras, horas devidas e faltas injustificadas para cada membro da equipe e também os totais gerais.
 
 ### Motor de Processamento (Backend)
-- **Cálculo de Banco de Horas:** Um comando de gerenciamento (`processar_pontos`) foi criado para ser executado diariamente (via cron job, por exemplo). Ele analisa os registros de ponto do dia anterior, compara com a escala do funcionário e calcula o saldo de horas (atrasos, saídas antecipadas, horas extras), registrando tudo na tabela de `BancoDeHoras`.
+- **Cálculo de Banco de Horas Automatizado:** Um comando de gerenciamento (`processar_pontos`) é executado diariamente por um **job agendado (cron)** dentro de um container Docker dedicado. Ele analisa os registros de ponto do dia anterior, compara com a escala do funcionário e calcula o saldo de horas (atrasos, saídas antecipadas, horas extras), registrando tudo na tabela de `BancoDeHoras`.
 
 ## Tecnologias Utilizadas
 
@@ -66,17 +69,17 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
    git clone https://github.com/riquefernandes/hr_system.git
    cd hr_system
    ```
-2. Construa e suba os containers Docker em modo "detached" (background):
+2. Construa e suba os containers Docker em modo "detached" (background). O compose agora inclui o serviço da aplicação web (`web`), o banco de dados (`db`) e o agendador de tarefas (`cron`):
    ```bash
-   sudo docker compose up --build -d
+   docker compose up --build -d
    ```
 3. Rode as migrações para criar a estrutura do banco de dados:
    ```bash
-   sudo docker compose exec web python manage.py migrate
+   docker compose exec web python manage.py migrate
    ```
 4. Crie um superusuário para acessar o painel de administração (o comando é não-interativo):
    ```bash
-   sudo docker compose exec -e DJANGO_SUPERUSER_USERNAME=admin -e DJANGO_SUPERUSER_EMAIL=admin@example.com -e DJANGO_SUPERUSER_PASSWORD=admin web python manage.py createsuperuser --no-input
+   docker compose exec -e DJANGO_SUPERUSER_USERNAME=admin -e DJANGO_SUPERUSER_EMAIL=admin@example.com -e DJANGO_SUPERUSER_PASSWORD=admin web python manage.py createsuperuser --no-input
    ```
 5. A aplicação estará disponível em `http://localhost:8000`.
    - O painel de administração está em `http://localhost:8000/admin/` (login: `admin`, senha: `admin`).
@@ -84,7 +87,7 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
 
 ## Próximos Passos e Evolução do Projeto
 
-- **Relatórios:** Criar uma área de relatórios para o RH e supervisores (absenteísmo, horas extras, etc.).
 - **Aprovação de Ponto Fora de Hora:** Implementar o fluxo de solicitação e aprovação para que um funcionário possa bater o ponto fora da janela permitida.
-- **Testes Automatizados:** Aumentar a cobertura de testes para garantir a estabilidade das regras de negócio.
-- **Job Agendado:** Configurar um serviço (como Celery Beat ou um Cron Job no host) para executar o comando `processar_pontos` automaticamente todos os dias.
+- **Testes Automatizados:** Continuar aumentando a cobertura de testes para garantir a estabilidade das regras de negócio.
+- **Melhorias na UI/UX:** Refinar a interface do usuário e a experiência geral, adicionando mais feedback visual e melhorando a navegação.
+

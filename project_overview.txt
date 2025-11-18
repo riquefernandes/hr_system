@@ -7,7 +7,7 @@ Este documento detalha a arquitetura, os componentes, as funcionalidades e a ló
 O `hr_system` é uma aplicação web construída sobre o framework Django, seguindo o padrão Model-View-Controller (MVC), embora no Django seja mais precisamente Model-Template-View (MTV). A aplicação é totalmente containerizada usando Docker e Docker Compose, o que garante um ambiente de desenvolvimento e produção consistente e isolado. O banco de dados utilizado é o PostgreSQL.
 
 -   **Django Framework:** Base sólida para o desenvolvimento web, fornecendo ORM, sistema de autenticação, painel administrativo e muito mais.
--   **Docker e Containerização:** Permite empacotar a aplicação e suas dependências em contêineres leves e portáteis, facilitando a implantação e o gerenciamento de ambientes.
+-   **Docker e Containerização:** Permite empacotar a aplicação e suas dependências em contêineres leves e portáteis. A orquestração é feita com o Docker Compose, que gerencia os serviços da aplicação (`web`), o banco de dados (`db`) e um serviço de agendamento de tarefas (`cron`).
 -   **Banco de Dados (PostgreSQL):** Um sistema de gerenciamento de banco de dados relacional robusto e de código aberto, ideal para aplicações que exigem integridade e escalabilidade.
 -   **Frontend:** HTML5, CSS3, JavaScript (Vanilla), HTMX (para atualizações dinâmicas)
 -   **Framework CSS:** Bootstrap 5
@@ -42,38 +42,37 @@ O `hr_system` é uma aplicação web construída sobre o framework Django, segui
     -   `Funcionario`: O modelo central, representando um funcionário.
     -   `FuncionarioEscala`: Associa um `Funcionario` a uma `Escala` por um período específico.
     -   `BancoDeHoras`: Registra o balanço de horas (créditos ou débitos) de um funcionário.
-    -   `RegistroPonto`: Registra os eventos de ponto (entrada, saída, pausas).
+    -   `RegistroPonto`: Registra os eventos de ponto (entrada, saída, pausas). O campo `timestamp` foi ajustado para permitir a inserção de dados em testes.
     -   `SolicitacaoHorario`: Registra pedidos de funcionários para bater o ponto fora do horário permitido.
-    -   `SolicitacaoAbono`: **(Novo)** Registra pedidos de funcionários para abonar faltas ou horas, com suporte a anexos.
+    -   `SolicitacaoAbono`: Registra pedidos de funcionários para abonar faltas ou horas, com suporte a anexos.
     -   `SolicitacaoAlteracaoEndereco`, `SolicitacaoAlteracaoBancaria`: Modelos para solicitações de alteração de dados cadastrais.
 
 -   `views.py`: Contém a lógica de negócio.
     -   `login_view`, `logout_view`, `CustomPasswordChangeView`: Views de autenticação e gestão de usuário.
-    -   `home_view`: Dashboard pessoal do funcionário, agora incluindo:
-        -   **Horário de Entrada:** Exibe o horário de entrada definido na escala.
-        -   **Horário de Saída:** Exibe o horário de saída definido na escala.
-        -   **Dias de Trabalho:** Exibe os dias da semana em que o funcionário deve trabalhar.
-        -   **Cronômetro de Tempo Logado:** Exibe o tempo que o funcionário está logado desde a última entrada.
-    -   `supervisor_dashboard_view`: Dashboard para supervisores.
+    -   `home_view`: Dashboard pessoal do funcionário.
+    -   `supervisor_dashboard_view`: Dashboard para supervisores com solicitações pendentes da equipe.
     -   `bate_ponto_view`: Processa o registro de ponto, com validações de status, horário e dia da semana.
-    -   `relatorio_folha_ponto`: Gera um relatório de folha de ponto para um funcionário em um período, identificando faltas injustificadas.
+    -   `relatorio_folha_ponto`: Gera um relatório de folha de ponto para um funcionário em um período.
+    -   `relatorio_equipe_view`: **(Novo)** Gera um relatório consolidado para a equipe de um supervisor, totalizando horas extras, devidas e faltas.
     -   `solicitar_horario_view`, `aprovar_solicitacao_horario`, `recusar_solicitacao_horario`: Fluxo de solicitação de ponto fora de hora.
-    -   `solicitar_abono_view`, `aprovar_solicitacao_abono`, `recusar_solicitacao_abono`: Fluxo completo para solicitação e aprovação/recusa de abonos. A view detecta automaticamente faltas recentes não justificadas para facilitar o preenchimento.
+    -   `solicitar_abono_view`, `aprovar_solicitacao_abono`, `recusar_solicitacao_abono`: Fluxo completo para solicitação e aprovação/recusa de abonos.
     -   `tabela_equipe_view`: View auxiliar para o dashboard do supervisor (HTMX).
 
--   `urls.py`: Define as rotas da aplicação, incluindo as novas rotas para relatórios (`/relatorio/`) e o fluxo de abonos (`/solicitar-abono/`, etc.).
+-   `urls.py`: Define as rotas da aplicação, incluindo as novas rotas para relatórios (`/relatorio/equipe/`) e o fluxo de abonos.
 
 -   `forms.py`: Define os formulários da aplicação.
     -   `RelatorioFolhaPontoForm`: Formulário para filtrar o relatório de folha de ponto.
-    -   `SolicitacaoAbonoForm`: Formulário dinâmico para o funcionário solicitar um abono. Exibe campos de data ou data/hora com base no tipo de abono (falta ou horas) e valida se a solicitação corresponde a um dia de trabalho válido.
+    -   `RelatorioEquipeForm`: **(Novo)** Formulário para filtrar o relatório de equipe por data.
+    -   `SolicitacaoAbonoForm`: Formulário dinâmico para o funcionário solicitar um abono.
     -   `SolicitacaoAlteracaoEnderecoForm`, `SolicitacaoAlteracaoBancariaForm`, `SolicitacaoHorarioForm`: Demais formulários de solicitação.
 
--   `management/commands/processar_pontos.py`: Comando de gerenciamento para processar os registros de ponto e popular o banco de horas.
+-   `management/commands/processar_pontos.py`: Comando de gerenciamento para processar os registros de ponto e popular o banco de horas. Agora é executado automaticamente.
 
 -   `templates/`: Contém os arquivos HTML.
     -   `funcionarios/home.html`, `funcionarios/supervisor_dashboard.html`: Dashboards principais.
-    -   `funcionarios/relatorio_folha_ponto.html`: Template para exibir o relatório de ponto.
-    -   `funcionarios/solicitar_abono.html`: Template com o formulário dinâmico para solicitar abono e a lista de faltas detectadas.
+    -   `funcionarios/relatorio_folha_ponto.html`: Template para exibir o relatório de ponto individual.
+    -   `funcionarios/relatorio_equipe.html`: **(Novo)** Template para exibir o relatório consolidado da equipe.
+    -   `funcionarios/solicitar_abono.html`: Template com o formulário dinâmico para solicitar abono.
     -   Demais templates para login, troca de senha, etc.
 
 3. Lógica de Negócio e Fluxos Chave
@@ -83,28 +82,21 @@ O `hr_system` é uma aplicação web construída sobre o framework Django, segui
 
 3.2. Registro de Ponto e Controle de Jornada
 -   **Bater Ponto:** Funcionários registram entrada, saída e pausas.
--   **Validações:** O sistema valida:
-    -   Unicidade de entrada/saída por dia.
-    -   Status do funcionário (deve estar 'ATIVO').
-    -   **Dia de Trabalho:** Impede o registro de ponto em dias de folga, conforme a escala.
-    -   Janela de tolerância para o horário de entrada.
+-   **Validações:** O sistema valida status do funcionário, dia de trabalho, janela de tolerância, etc.
 -   **Solicitações:** Fluxos de aprovação/recusa para ponto fora de hora.
 
-3.3. Banco de Horas
--   Um comando (`processar_pontos`) analisa os registros diários e calcula o saldo de horas (crédito/débito) de cada funcionário, salvando no `BancoDeHoras`.
+3.3. Banco de Horas Automatizado
+-   Um serviço `cron` no Docker executa o comando `processar_pontos` diariamente.
+-   O comando analisa os registros do dia anterior, compara com a escala e calcula o saldo de horas (crédito/débito) de cada funcionário, salvando no `BancoDeHoras`.
 
-3.4. Relatório de Folha de Ponto
--   Usuários (funcionários e supervisores) podem gerar um relatório de ponto para um período específico.
--   O relatório exibe as marcações de cada dia, o saldo do banco de horas e identifica **faltas injustificadas** (dias de trabalho sem registro de ponto).
+3.4. Relatórios
+-   **Relatório de Folha de Ponto:** Usuários podem gerar um relatório de ponto individual para um período, que exibe marcações, saldo do banco de horas e identifica faltas injustificadas.
+-   **Relatório de Equipe:** Supervisores podem gerar um relatório consolidado para sua equipe, visualizando o total de horas extras, horas devidas e faltas por funcionário em um determinado período.
 
 3.5. Solicitação de Abono
--   **Detecção de Faltas:** A página de solicitação verifica os últimos 30 dias (a partir da data de contratação do funcionário) e lista os dias em que ele deveria ter trabalhado (conforme sua escala específica para aquele dia) mas não o fez, sugerindo-os para abono.
--   **Solicitação Inteligente:** O funcionário pode clicar em uma falta detectada para pré-preencher o formulário, ou preenchê-lo manualmente. O formulário é dinâmico:
-    -   Para **"Abono de Falta"**, exibe um único campo de data.
-    -   Para **"Abono de Atraso/Horas"**, exibe campos de data e hora de início e fim.
--   **Validação:** O formulário impede o envio de solicitações para dias em que o funcionário estava de folga.
--   **Anexo e Análise pelo Supervisor:** O funcionário pode explicar o motivo e anexar um documento. O supervisor visualiza o pedido em seu dashboard, pode baixar o anexo e escolher "Aprovar" ou "Recusar".
--   **Lógica de Aprovação:** Ao aprovar, o sistema cria automaticamente um registro de crédito no `BancoDeHoras` do funcionário, compensando o período solicitado.
+-   O sistema detecta faltas recentes não justificadas e as sugere para abono.
+-   O funcionário preenche um formulário dinâmico, anexa documentos se necessário, e envia para o supervisor.
+-   O supervisor aprova ou recusa; a aprovação gera um crédito correspondente no banco de horas.
 
 4. Tecnologias Utilizadas (Resumo)
 
