@@ -93,15 +93,6 @@
     </div>
 </div>
 
-{% if ultimo_ponto_entrada and funcionario_data.status_operacional != 'OFFLINE' %}
-<div class="card mb-4">
-    <div class="card-body text-center">
-        <h5 class="card-title">Tempo Logado</h5>
-        <p class="card-text fs-4 fw-bold" id="logged-in-timer" data-start-time="{{ ultimo_ponto_entrada.timestamp.isoformat }}"></p>
-    </div>
-</div>
-{% endif %}
-
 <div class="card mb-4">
     <div class="card-body">
         <div class="d-grid gap-2">
@@ -311,33 +302,11 @@
             });
         }
 
-        // --- Lógica do Cronômetro de Tempo Logado ---
-        function updateLoggedInTimer() {
-            const timerElement = document.getElementById('logged-in-timer');
-            if (!timerElement || !timerElement.dataset.startTime) return;
-
-            const startTime = new Date(timerElement.dataset.startTime);
-            const now = new Date();
-            const diff = now - startTime;
-
-            if (isNaN(diff)) {
-                timerElement.textContent = '00:00:00';
-                return;
-            }
-
-            const hours = Math.floor(diff / (1000 * 60 * 60));
-            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-
-            const pad = (num) => num.toString().padStart(2, '0');
-            timerElement.textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
-        }
-
         // Inicia a atualização dos cronômetros
+        // Chama uma vez para não esperar 1 segundo para a primeira exibição
         updatePauseTimers(); 
-        updateLoggedInTimer();
+        // Define o intervalo para atualizar a cada segundo
         setInterval(updatePauseTimers, 1000);
-        setInterval(updateLoggedInTimer, 1000);
     });
 </script>
 
