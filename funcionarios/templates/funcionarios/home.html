@@ -270,6 +270,31 @@
 
 <hr />
 
+<!-- Modal Fim da Pausa -->
+<div class="modal fade" id="modalFimPausa" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="modalFimPausaLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="modalFimPausaLabel">Pausa Finalizada</h5>
+      </div>
+      <div class="modal-body text-center">
+        <p>Seu tempo de pausa programada terminou.</p>
+        <p class="fs-3 fw-bold" id="modal-countdown"></p>
+        <p>Por favor, registre seu retorno.</p>
+      </div>
+      <div class="modal-footer justify-content-center">
+        <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="tipo_ponto" value="VOLTA_PAUSA">
+            <button type="submit" class="btn btn-success btn-lg">
+                Voltar da Pausa
+            </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // --- Lógica para pedir permissão de notificação ---
@@ -361,25 +386,45 @@
         // --- Lógica do Countdown da Pausa Programada ---
         let notificationSent = false; // Flag para controlar a notificação
         const notificationSound = new Audio('https://orangefreesounds.com/wp-content/uploads/2025/08/Notification-alert-sound-effect.mp3');
+        
+        // --- Lógica do Modal de Fim de Pausa ---
+        const modalElement = document.getElementById('modalFimPausa');
+        const modalFimPausa = modalElement ? new bootstrap.Modal(modalElement) : null;
+        const modalCountdownElement = document.getElementById('modal-countdown');
 
         function updateBreakCountdown() {
             const countdownElement = document.getElementById('break-countdown');
             if (!countdownElement || !countdownElement.dataset.breakEndTime) {
                 notificationSent = false; // Reseta a flag se não houver countdown
+                if (modalFimPausa && modalElement.classList.contains('show')) {
+                    modalFimPausa.hide(); // Esconde o modal se a pausa for cancelada/terminada
+                }
                 return;
             }
 
             const endTime = new Date(countdownElement.dataset.breakEndTime);
             const now = new Date();
             const diff = endTime - now;
+            const pad = (num) => num.toString().padStart(2, '0');
 
             if (isNaN(diff) || diff < 0) {
+                const timeOver = Math.abs(diff);
+                const minutesOver = Math.floor((timeOver % (1000 * 60 * 60)) / (1000 * 60));
+                const secondsOver = Math.floor((timeOver % (1000 * 60)) / 1000);
+                const timeOverText = `${pad(minutesOver)}:${pad(secondsOver)} excedido`;
+
                 countdownElement.textContent = 'Tempo Esgotado!';
                 countdownElement.classList.remove('bg-danger');
                 countdownElement.classList.add('bg-success');
 
-                // Envia a notificação apenas uma vez
+                if (modalCountdownElement) {
+                    modalCountdownElement.textContent = timeOverText;
+                }
+
+                // Envia a notificação e mostra o modal apenas uma vez
                 if (!notificationSent) {
+                    if (modalFimPausa) modalFimPausa.show();
+
                     if (Notification.permission === 'granted') {
                         new Notification('Fim da Pausa', {
                             body: 'Seu tempo de pausa programada terminou.',
@@ -394,9 +439,13 @@
 
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+            const remainingTimeText = `Fim em: ${pad(minutes)}:${pad(seconds)}`;
+            
+            countdownElement.textContent = remainingTimeText;
 
-            const pad = (num) => num.toString().padStart(2, '0');
-            countdownElement.textContent = `Fim em: ${pad(minutes)}:${pad(seconds)}`;
+            if (modalCountdownElement) {
+                modalCountdownElement.textContent = remainingTimeText;
+            }
         }
 
         updateBreakCountdown();
