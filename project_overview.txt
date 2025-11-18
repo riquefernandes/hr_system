@@ -49,7 +49,11 @@ O `hr_system` é uma aplicação web construída sobre o framework Django, segui
 
 -   `views.py`: Contém a lógica de negócio.
     -   `login_view`, `logout_view`, `CustomPasswordChangeView`: Views de autenticação e gestão de usuário.
-    -   `home_view`: Dashboard pessoal do funcionário.
+    -   `home_view`: Dashboard pessoal do funcionário, agora incluindo:
+        -   **Horário de Entrada:** Exibe o horário de entrada definido na escala.
+        -   **Horário de Saída:** Exibe o horário de saída definido na escala.
+        -   **Dias de Trabalho:** Exibe os dias da semana em que o funcionário deve trabalhar.
+        -   **Cronômetro de Tempo Logado:** Exibe o tempo que o funcionário está logado desde a última entrada.
     -   `supervisor_dashboard_view`: Dashboard para supervisores.
     -   `bate_ponto_view`: Processa o registro de ponto, com validações de status, horário e dia da semana.
     -   `relatorio_folha_ponto`: Gera um relatório de folha de ponto para um funcionário em um período, identificando faltas injustificadas.

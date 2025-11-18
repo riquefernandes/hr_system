@@ -25,7 +25,11 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
     - **Registro de Ponto Virtual:** Funcionalidade para registrar Entrada, Saída e Pausas (café e almoço).
     - **Restrição de Ponto:** O funcionário só pode registrar a entrada dentro de uma janela de tempo permitida em relação à sua escala (ex: 30 min antes e 60 min depois).
     - **Consulta de Escala:** Visualização da escala de trabalho atual.
+    - **Horário de Entrada:** Exibe o horário de entrada definido na escala.
+    - **Horário de Saída:** Exibe o horário de saída definido na escala.
+    - **Dias de Trabalho:** Exibe os dias da semana em que o funcionário deve trabalhar.
     - **Consulta de Banco de Horas:** Visualização do saldo total de horas (positivo ou negativo).
+    - **Cronômetro de Tempo Logado:** Exibe o tempo que o funcionário está logado desde a última entrada.
 - **Solicitação de Alteração:** Formulários para solicitar alterações de endereço e dados bancários, com histórico e status.
 
 ### Visão do Supervisor
