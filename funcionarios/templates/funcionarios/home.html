@@ -144,6 +144,15 @@
                 <p><strong>Data de Contratação:</strong> {{ funcionario_data.data_contratacao|date:"d/m/Y" }}</p>
                 <p><strong>Cargo:</strong> {{ funcionario_data.cargo.nome|default:"Não informado" }}</p>
                 <p><strong>Escala Atual:</strong> {{ escala_atual.escala.nome|default:"Nenhuma escala atribuída" }}</p>
+                {% if escala_atual %}
+                    <p><strong>Horário de Entrada:</strong> {{ escala_atual.escala.horario_entrada|time:"H:i" }}</p>
+                    <p><strong>Horário de Saída:</strong> {{ escala_atual.escala.horario_saida|time:"H:i" }}</p>
+                    <p><strong>Dias de Trabalho:</strong> {{ dias_de_trabalho }}</p>
+                {% else %}
+                    <p><strong>Horário de Entrada:</strong> Não informado</p>
+                    <p><strong>Horário de Saída:</strong> Não informado</p>
+                    <p><strong>Dias de Trabalho:</strong> Não informado</p>
+                {% endif %}
                 <p><strong>Centro de Custo:</strong> {{ funcionario_data.centro_de_custo.nome|default:"Não informado" }}</p>
             </div>
         </div>

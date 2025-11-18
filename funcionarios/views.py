@@ -176,6 +176,27 @@ def home_view(request):
         funcionario=funcionario
     ).order_by("-data_solicitacao")
 
+    # Lógica de Ponto
+    ultimo_ponto_entrada = RegistroPonto.objects.filter(
+        funcionario=funcionario,
+        tipo='ENTRADA',
+        timestamp__date=agora.date()
+    ).order_by('-timestamp').first()
+
+    def formatar_dias_semana(dias_str):
+        dias_map = {
+            '0': 'Seg', '1': 'Ter', '2': 'Qua', '3': 'Qui',
+            '4': 'Sex', '5': 'Sáb', '6': 'Dom'
+        }
+        if not dias_str:
+            return "N/A"
+        dias_list = [dias_map.get(d.strip(), '') for d in dias_str.split(',')]
+        return ", ".join(filter(None, dias_list))
+
+    dias_de_trabalho = ""
+    if escala_atual:
+        dias_de_trabalho = formatar_dias_semana(escala_atual.escala.dias_semana)
+
     context = {
         "funcionario_data": funcionario,
         "form_endereco": form_endereco,
@@ -183,11 +204,13 @@ def home_view(request):
         "solicitacoes_endereco": solicitacoes_endereco,
         "solicitacoes_bancarias": solicitacoes_bancarias,
         "solicitacoes_abono": solicitacoes_abono,
-        "proxima_pausa_regra": proxima_pausa_regra,  # Variável de contexto atualizada
+        "proxima_pausa_regra": proxima_pausa_regra,
         "ultima_pausa": ultima_pausa,
         "escala_atual": escala_atual,
+        "dias_de_trabalho": dias_de_trabalho,
         "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",
         "saldo_banco_horas_negativo": saldo_total_minutos < 0,
+        "ultimo_ponto_entrada": ultimo_ponto_entrada,
     }
     return render(request, "funcionarios/home.html", context)
 
