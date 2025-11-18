@@ -176,6 +176,13 @@ def home_view(request):
         funcionario=funcionario
     ).order_by("-data_solicitacao")
 
+    # Lógica de Ponto
+    ultimo_ponto_entrada = RegistroPonto.objects.filter(
+        funcionario=funcionario,
+        tipo='ENTRADA',
+        timestamp__date=agora.date()
+    ).order_by('-timestamp').first()
+
     context = {
         "funcionario_data": funcionario,
         "form_endereco": form_endereco,
@@ -188,6 +195,7 @@ def home_view(request):
         "escala_atual": escala_atual,
         "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",
         "saldo_banco_horas_negativo": saldo_total_minutos < 0,
+        "ultimo_ponto_entrada": ultimo_ponto_entrada,
     }
     return render(request, "funcionarios/home.html", context)
 
