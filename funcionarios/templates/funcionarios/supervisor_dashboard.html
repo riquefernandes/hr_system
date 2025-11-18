@@ -59,9 +59,20 @@
         </div>
     </div>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <a href="{% url 'funcionarios:relatorio_folha_ponto' %}" class="btn btn-outline-primary w-100">Acessar Relatório de Folha de Ponto da Equipe</a>
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <a href="{% url 'funcionarios:relatorio_folha_ponto' %}" class="btn btn-outline-primary w-100">Relatório de Folha de Ponto</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body text-center">
+                    <a href="{% url 'funcionarios:relatorio_equipe' %}" class="btn btn-primary w-100">Relatório de Gestão de Equipe</a>
+                </div>
+            </div>
         </div>
     </div>
 

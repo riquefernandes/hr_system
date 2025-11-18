@@ -32,6 +32,11 @@ urlpatterns = [
         views.supervisor_dashboard_view,
         name="supervisor_dashboard",
     ),
+    path(
+        "supervisor/relatorio-equipe/",
+        views.relatorio_equipe_view,
+        name="relatorio_equipe",
+    ),
     path("supervisor/tabela-equipe/", views.tabela_equipe_view, name="tabela_equipe"),
     path(
         "solicitar-horario/",

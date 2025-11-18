@@ -15,6 +15,7 @@ from collections import defaultdict
 
 from .forms import (
     RelatorioFolhaPontoForm,
+    RelatorioEquipeForm,
     SolicitacaoAbonoForm,
     SolicitacaoAlteracaoEnderecoForm,
     SolicitacaoAlteracaoBancariaForm,
@@ -577,6 +578,88 @@ def relatorio_folha_ponto(request):
 
     context = {"form": form, "relatorio": relatorio_data}
     return render(request, "funcionarios/relatorio_folha_ponto.html", context)
+
+
+@login_required
+def relatorio_equipe_view(request):
+    # Apenas supervisores podem acessar
+    if not request.user.is_superuser and not request.user.funcionario.equipe.exists():
+        messages.error(request, "Você não tem permissão para acessar esta página.")
+        return redirect("funcionarios:home")
+
+    form = RelatorioEquipeForm()
+    relatorio_data = None
+    totais = None
+
+    if request.method == "POST":
+        form = RelatorioEquipeForm(request.POST)
+        if form.is_valid():
+            data_inicio = form.cleaned_data["data_inicio"]
+            data_fim = form.cleaned_data["data_fim"]
+            supervisor = request.user.funcionario
+            equipe = supervisor.equipe.all() if not request.user.is_superuser else Funcionario.objects.all()
+
+
+            relatorio_data = []
+            total_geral_extras = 0
+            total_geral_devidas = 0
+            total_geral_faltas = 0
+
+            for funcionario in equipe:
+                # 1. Calcular Horas Extras e Devidas a partir do Banco de Horas
+                banco_horas = BancoDeHoras.objects.filter(
+                    funcionario=funcionario, data__range=(data_inicio, data_fim)
+                )
+                horas_extras_minutos = banco_horas.filter(minutos__gt=0).aggregate(total=Sum('minutos'))['total'] or 0
+                horas_devidas_minutos = banco_horas.filter(minutos__lt=0).aggregate(total=Sum('minutos'))['total'] or 0
+
+                # 2. Calcular Faltas Injustificadas
+                faltas = 0
+                dias_no_periodo = (data_fim - data_inicio).days + 1
+                for dia_offset in range(dias_no_periodo):
+                    data_atual = data_inicio + timedelta(days=dia_offset)
+
+                    # Verifica se há registro de ponto ou abono aprovado para o dia
+                    tem_registro = RegistroPonto.objects.filter(funcionario=funcionario, timestamp__date=data_atual).exists()
+                    tem_abono = SolicitacaoAbono.objects.filter(
+                        funcionario=funcionario,
+                        data_inicio__date=data_atual,
+                        status='APROVADO'
+                    ).exists()
+
+                    if tem_registro or tem_abono:
+                        continue
+
+                    # Verifica se era um dia de trabalho
+                    escala_info = FuncionarioEscala.objects.filter(
+                        funcionario=funcionario, data_inicio__lte=data_atual
+                    ).filter(Q(data_fim__gte=data_atual) | Q(data_fim__isnull=True)).first()
+
+                    if escala_info:
+                        dia_da_semana = data_atual.weekday()
+                        if str(dia_da_semana) in escala_info.escala.dias_semana.split(","):
+                            faltas += 1
+                
+                relatorio_data.append({
+                    'funcionario': funcionario,
+                    'horas_extras_minutos': horas_extras_minutos,
+                    'horas_devidas_minutos': abs(horas_devidas_minutos),
+                    'faltas': faltas,
+                })
+
+                total_geral_extras += horas_extras_minutos
+                total_geral_devidas += abs(horas_devidas_minutos)
+                total_geral_faltas += faltas
+            
+            totais = {
+                'total_geral_extras_minutos': total_geral_extras,
+                'total_geral_devidas_minutos': total_geral_devidas,
+                'total_geral_faltas': total_geral_faltas,
+            }
+
+
+    context = {"form": form, "relatorio": relatorio_data, "totais": totais}
+    return render(request, "funcionarios/relatorio_equipe.html", context)
 
 
 def logout_view(request):

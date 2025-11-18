@@ -140,6 +140,11 @@ class RelatorioFolhaPontoForm(forms.Form):
             self.fields["funcionario"].widget = forms.HiddenInput()
 
 
+class RelatorioEquipeForm(forms.Form):
+    data_inicio = forms.DateField(label="Data de Início", widget=DateInput)
+    data_fim = forms.DateField(label="Data de Fim", widget=DateInput)
+
+
 # Este é o nosso novo formulário para endereço
 class SolicitacaoAlteracaoEnderecoForm(forms.ModelForm):
     class Meta:

@@ -1,0 +1,86 @@
+{% extends "funcionarios/base.html" %}
+{% load custom_filters %}
+
+{% block title %}Relatório de Equipe{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="mb-4">Relatório de Gestão de Equipe</h2>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Filtrar Período
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="row align-items-end">
+                    <div class="col-md-4">
+                        <label for="{{ form.data_inicio.id_for_label }}" class="form-label">{{ form.data_inicio.label }}</label>
+                        {{ form.data_inicio }}
+                    </div>
+                    <div class="col-md-4">
+                        <label for="{{ form.data_fim.id_for_label }}" class="form-label">{{ form.data_fim.label }}</label>
+                        {{ form.data_fim }}
+                    </div>
+                    <div class="col-md-4">
+                        <button type="submit" class="btn btn-primary w-100">Gerar Relatório</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if relatorio %}
+    <div class="card">
+        <div class="card-header">
+            Resultados do Período
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Funcionário</th>
+                            <th class="text-center">Horas Extras (HH:MM)</th>
+                            <th class="text-center">Horas Devidas (HH:MM)</th>
+                            <th class="text-center">Faltas (Dias)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in relatorio %}
+                        <tr>
+                            <td>{{ item.funcionario.nome_completo }}</td>
+                            <td class="text-center text-success">{{ item.horas_extras_minutos|format_minutes }}</td>
+                            <td class="text-center text-danger">{{ item.horas_devidas_minutos|format_minutes }}</td>
+                            <td class="text-center">{{ item.faltas }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if totais %}
+                    <tfoot class="table-group-divider">
+                        <tr class="fw-bold">
+                            <td>TOTAIS</td>
+                            <td class="text-center text-success">{{ totais.total_geral_extras_minutos|format_minutes }}</td>
+                            <td class="text-center text-danger">{{ totais.total_geral_devidas_minutos|format_minutes }}</td>
+                            <td class="text-center">{{ totais.total_geral_faltas }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+        {% if request.method == "POST" %}
+        <div class="alert alert-info" role="alert">
+            Nenhum dado encontrado para o período selecionado.
+        </div>
+        {% else %}
+        <div class="alert alert-light" role="alert">
+            Selecione um período e clique em "Gerar Relatório" para ver os dados da sua equipe.
+        </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}
