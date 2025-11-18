@@ -1,0 +1,1 @@
+0 1 * * * /app/scripts/run_processar_pontos.sh >> /var/log/cron.log 2>&1
