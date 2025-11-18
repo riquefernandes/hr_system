@@ -272,6 +272,13 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        // --- Lógica para pedir permissão de notificação ---
+        if ('Notification' in window) {
+            if (Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+        }
+
         const cepInput = document.getElementById('id_cep');
         if (cepInput) {
             cepInput.addEventListener('blur', function () {
@@ -352,9 +359,15 @@
         setInterval(updateLoggedInTimer, 1000);
 
         // --- Lógica do Countdown da Pausa Programada ---
+        let notificationSent = false; // Flag para controlar a notificação
+        const notificationSound = new Audio('https://orangefreesounds.com/wp-content/uploads/2025/08/Notification-alert-sound-effect.mp3');
+
         function updateBreakCountdown() {
             const countdownElement = document.getElementById('break-countdown');
-            if (!countdownElement || !countdownElement.dataset.breakEndTime) return;
+            if (!countdownElement || !countdownElement.dataset.breakEndTime) {
+                notificationSent = false; // Reseta a flag se não houver countdown
+                return;
+            }
 
             const endTime = new Date(countdownElement.dataset.breakEndTime);
             const now = new Date();
@@ -364,6 +377,18 @@
                 countdownElement.textContent = 'Tempo Esgotado!';
                 countdownElement.classList.remove('bg-danger');
                 countdownElement.classList.add('bg-success');
+
+                // Envia a notificação apenas uma vez
+                if (!notificationSent) {
+                    if (Notification.permission === 'granted') {
+                        new Notification('Fim da Pausa', {
+                            body: 'Seu tempo de pausa programada terminou.',
+                            icon: '/static/admin/img/icon-clock.svg'
+                        });
+                        notificationSound.play();
+                    }
+                    notificationSent = true;
+                }
                 return;
             }
 
