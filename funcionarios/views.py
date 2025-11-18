@@ -87,6 +87,35 @@ def supervisor_dashboard_view(request):
 @login_required
 def home_view(request):
     funcionario = request.user.funcionario
+
+    def sincronizar_status_operacional(func):
+        """
+        Verifica o último registro de ponto do dia e atualiza o status_operacional
+        do funcionário se ele estiver inconsistente.
+        """
+        agora = timezone.now()
+        inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
+
+        ultimo_registro = RegistroPonto.objects.filter(
+            funcionario=func,
+            timestamp__gte=inicio_do_dia
+        ).order_by('-timestamp').first()
+
+        novo_status = 'OFFLINE'  # Padrão
+        if ultimo_registro:
+            if ultimo_registro.tipo == 'ENTRADA' or ultimo_registro.tipo.startswith('VOLTA_'):
+                novo_status = 'DISPONIVEL'
+            elif ultimo_registro.tipo.startswith('SAIDA_'):
+                novo_status = 'EM_PAUSA'
+            # Se for SAIDA, o status já é OFFLINE
+
+        if func.status_operacional != novo_status:
+            func.status_operacional = novo_status
+            func.save(update_fields=['status_operacional'])
+
+    # Garante que o status do funcionário está correto ao carregar a home
+    sincronizar_status_operacional(funcionario)
+
     form_endereco = SolicitacaoAlteracaoEnderecoForm()
     form_bancario = SolicitacaoAlteracaoBancariaForm()
 
