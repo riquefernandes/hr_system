@@ -2,7 +2,7 @@
 
 ## Descrição
 
-**hr_system** é uma aplicação web desenvolvida em Django para a administração de funcionários de um contact center. O sistema evoluiu para incluir um robusto controle de jornada de trabalho, com registro de ponto, gerenciamento de escalas, banco de horas, relatórios e dashboards para supervisores.
+**hr_system** é uma aplicação web desenvolvida em Django para a administração de funcionários de um contact center. O sistema evoluiu para incluir um robusto controle de jornada de trabalho, com registro de ponto, gerenciamento de escalas, banco de horas, relatórios e dashboards para supervisores **e Analistas de RH**.
 
 A aplicação é totalmente containerizada com Docker, garantindo um ambiente de desenvolvimento e produção consistente e isolado.
 
@@ -20,30 +20,38 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
 
 ### Visão do Funcionário Comum (Frontend)
 - **Autenticação Segura:** Tela de login (`/login`) e logout, com **troca de senha obrigatória no primeiro acesso**.
-- **Dashboard Pessoal (`/home`):**
-    - Visualização completa de dados cadastrais.
-    - **Registro de Ponto Virtual:** Funcionalidade para registrar Entrada, Saída e Pausas (café e almoço).
-    - **Restrição de Ponto:** O funcionário só pode registrar a entrada dentro de uma janela de tempo permitida em relação à sua escala (ex: 30 min antes e 60 min depois).
-    - **Consulta de Escala:** Visualização da escala de trabalho atual.
-    - **Horário de Entrada:** Exibe o horário de entrada definido na escala.
-    - **Horário de Saída:** Exibe o horário de saída definido na escala.
-    - **Dias de Trabalho:** Exibe os dias da semana em que o funcionário deve trabalhar.
-    - **Consulta de Banco de Horas:** Visualização do saldo total de horas (positivo ou negativo).
-    - **Cronômetro de Tempo Logado:** Exibe o tempo que o funcionário está logado desde a última entrada.
-- **Solicitação de Alteração:** Formulários para solicitar alterações de endereço e dados bancários, com histórico e status.
+- **Página Inicial (`/home`) - Simplificada:**
+    - Foco exclusivo no **Registro de Ponto Virtual:** Funcionalidade para registrar Entrada, Saída e Pausas (programadas e pessoais).
+    - **Contagem Regressiva:** Exibe o tempo restante de pausas programadas.
+    - **Tempo Logado:** Exibe o tempo que o funcionário está logado desde a última entrada.
+    - **Últimos Registros:** Tabela com os últimos registros de ponto do dia.
+- **Meu Perfil (`/meu-perfil`) - Nova Página:**
+    - Visualização completa de dados cadastrais (pessoais, endereço, bancários).
+    - Formulários para **Solicitação de Alteração de Endereço e Dados Bancários**, com histórico e status.
+    - Histórico de **Solicitações de Abono** enviadas.
+- **Minha Jornada (`/minha-jornada`) - Nova Página:**
+    - Detalhes da **Escala de Trabalho** atual do funcionário (horários, dias).
+    - Visualização do **Saldo do Banco de Horas** total.
+    - Link para o Relatório de Folha de Ponto individual.
+- **Navegação Centralizada:** Um menu de navegação responsivo (hamburger menu) foi adicionado à base da aplicação, facilitando o acesso a todas as páginas.
 
-### Visão do Supervisor
-- **Dashboard de Equipe (`/supervisor/dashboard`):**
+### Visão do Supervisor / Analista de RH
+- **Dashboard de Gestão (`/supervisor/dashboard`):**
     - Visualização em tempo real do status operacional de todos os funcionários da sua equipe (Disponível, Em Pausa, Offline).
+    - **Para Analistas de RH:** Acesso a todas as solicitações pendentes de **todos os funcionários** (horário e abono).
+    - **Para Supervisores:** Acesso a todas as solicitações pendentes de sua equipe.
     - A tabela da equipe é atualizada automaticamente a cada 15 segundos (via HTMX).
     - **Cronômetro de Pausa:** Exibe há quanto tempo um funcionário está em pausa.
     - **Alerta de Limite de Pausa:** O cronômetro fica vermelho e em negrito se o funcionário exceder o tempo limite para aquela pausa específica.
 - **Relatório de Equipe (`/relatorio/equipe`):**
-    - Permite que o supervisor gere um relatório consolidado para sua equipe dentro de um período de datas.
+    - Permite que o supervisor ou Analista de RH gere um relatório consolidado para sua equipe/empresa dentro de um período de datas.
     - O relatório exibe o total de horas extras, horas devidas e faltas injustificadas para cada membro da equipe e também os totais gerais.
+- **Aprovação de Solicitações:** Supervisores e Analistas de RH podem aprovar/recusar solicitações de horário e abono.
 
 ### Motor de Processamento (Backend)
-- **Cálculo de Banco de Horas Automatizado:** Um comando de gerenciamento (`processar_pontos`) é executado diariamente por um **job agendado (cron)** dentro de um container Docker dedicado. Ele analisa os registros de ponto do dia anterior, compara com a escala do funcionário e calcula o saldo de horas (atrasos, saídas antecipadas, horas extras), registrando tudo na tabela de `BancoDeHoras`.
+- **Cálculo de Banco de Horas Automatizado:** Um comando de gerenciamento (`processar_pontos`) é executado diariamente (agora a cada 2 minutos para testes) por um **job agendado (cron)** dentro de um container Docker dedicado. Ele analisa os registros de ponto do dia anterior, compara com a escala do funcionário e calcula o saldo de horas (atrasos, saídas antecipadas, horas extras), registrando tudo na tabela de `BancoDeHoras`.
+- **Integridade de Dados:** O modelo `BancoDeHoras` agora possui uma restrição de unicidade (`unique_together`) para evitar a criação de registros duplicados para o mesmo funcionário no mesmo dia. Um script de migração de dados foi adicionado para limpar duplicatas existentes.
+- **Lógica de Abono Aprimorada:** O script `processar_pontos` agora ignora dias com `SolicitacaoAbono` aprovada, garantindo que o saldo de horas do dia seja zero (nem débito, nem crédito indevido).
 
 ## Tecnologias Utilizadas
 
@@ -69,19 +77,23 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
    git clone https://github.com/riquefernandes/hr_system.git
    cd hr_system
    ```
-2. Construa e suba os containers Docker em modo "detached" (background). O compose agora inclui o serviço da aplicação web (`web`), o banco de dados (`db`) e o agendador de tarefas (`cron`):
+2. **Remova o ambiente virtual local (se existir), pois ele agora é gerenciado pelo Docker:**
+   ```bash
+   rm -rf venv
+   ```
+3. Construa e suba os containers Docker em modo "detached" (background). O compose agora inclui o serviço da aplicação web (`web`), o banco de dados (`db`) e o agendador de tarefas (`cron`):
    ```bash
    docker compose up --build -d
    ```
-3. Rode as migrações para criar a estrutura do banco de dados:
+4. Rode as migrações para criar a estrutura do banco de dados:
    ```bash
    docker compose exec web python manage.py migrate
    ```
-4. Crie um superusuário para acessar o painel de administração (o comando é não-interativo):
+5. Crie um superusuário para acessar o painel de administração (o comando é não-interativo):
    ```bash
    docker compose exec -e DJANGO_SUPERUSER_USERNAME=admin -e DJANGO_SUPERUSER_EMAIL=admin@example.com -e DJANGO_SUPERUSER_PASSWORD=admin web python manage.py createsuperuser --no-input
    ```
-5. A aplicação estará disponível em `http://localhost:8000`.
+6. A aplicação estará disponível em `http://localhost:8000`.
    - O painel de administração está em `http://localhost:8000/admin/` (login: `admin`, senha: `admin`).
    - A tela de login para funcionários está em `http://localhost:8000/login/`.
 
@@ -90,4 +102,5 @@ A aplicação é totalmente containerizada com Docker, garantindo um ambiente de
 - **Aprovação de Ponto Fora de Hora:** Implementar o fluxo de solicitação e aprovação para que um funcionário possa bater o ponto fora da janela permitida.
 - **Testes Automatizados:** Continuar aumentando a cobertura de testes para garantir a estabilidade das regras de negócio.
 - **Melhorias na UI/UX:** Refinar a interface do usuário e a experiência geral, adicionando mais feedback visual e melhorando a navegação.
-
+- **Reintrodução da pausa para almoço:** Integrar a pausa para almoço de forma robusta na lógica de controle de ponto e na UI.
+- **Gestão de Feriados:** Adicionar funcionalidade para o sistema reconhecer e aplicar regras específicas em feriados.
