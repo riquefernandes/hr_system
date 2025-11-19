@@ -1,0 +1,163 @@
+{% extends "funcionarios/base.html" %}
+
+{% block title %}Meu Perfil{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h2">Meu Perfil e Solicitações</h1>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">
+            Informações Pessoais e Documentos
+        </div>
+        <div class="card-body">
+            <p><strong>Nome Completo:</strong> {{ funcionario_data.nome_completo }}</p>
+            <p><strong>Status:</strong> {{ funcionario_data.get_status_display }}</p>
+            <p><strong>Matrícula:</strong> {{ funcionario_data.user.username }}</p>
+            <p><strong>Email Corporativo:</strong> {{ funcionario_data.user.email }}</p>
+            <p><strong>Email Pessoal:</strong> {{ funcionario_data.email_pessoal|default:"Não informado" }}</p>
+            <p><strong>Telefone Celular:</strong> {{ funcionario_data.telefone_celular|default:"Não informado" }}</p>
+            <p><strong>Data de Nascimento:</strong> {{ funcionario_data.data_nascimento | date:"d/m/Y" }}</p>
+            <p><strong>Escolaridade:</strong> {{ funcionario_data.get_escolaridade_display|default:"Não informado" }}</p>
+            <p><strong>CPF:</strong> {{ funcionario_data.cpf }}</p>
+            <p><strong>RG:</strong> {{ funcionario_data.rg }}</p>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header">Endereço</div>
+        <div class="card-body">
+            <p><strong>CEP:</strong> {{ funcionario_data.cep }}</p>
+            <p><strong>Rua:</strong> {{ funcionario_data.rua }}, Nº {{ funcionario_data.numero }}</p>
+            <p><strong>Complemento:</strong> {{ funcionario_data.complemento|default:"N/A" }}</p>
+            <p><strong>Bairro:</strong> {{ funcionario_data.bairro }}</p>
+            <p><strong>Cidade/Estado:</strong> {{ funcionario_data.cidade }} / {{ funcionario_data.estado }}</p>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">Dados Bancários</div>
+        <div class="card-body">
+            <p><strong>Banco:</strong> {{ funcionario_data.banco.nome|default:"Não informado" }}</p>
+            <p><strong>Agência:</strong> {{ funcionario_data.agencia|default:"Não informado" }}</p>
+            <p><strong>Conta:</strong> {{ funcionario_data.conta|default:"Não informado" }}</p>
+        </div>
+    </div>
+
+
+    <hr />
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">Solicitar Alteração de Endereço</div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %} 
+                        {{ form_endereco.as_p }}
+                        <button type="submit" name="submit_endereco" class="btn btn-primary">
+                            Enviar Solicitação de Endereço
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">Solicitar Alteração de Dados Bancários</div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %} 
+                        {{ form_bancario.as_p }}
+                        <button type="submit" name="submit_bancario" class="btn btn-primary">
+                            Enviar Solicitação Bancária
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <hr />
+
+    <h2>Histórico de Solicitações</h2>
+    <div class="row">
+        <div class="col-md-6">
+            <h4>Alterações de Endereço</h4>
+            {% if solicitacoes_endereco %}
+            <ul class="list-group">
+                {% for s in solicitacoes_endereco %}
+                <li class="list-group-item">
+                    {{ s.data_solicitacao|date:"d/m/Y" }}: Solicitação para CEP {{s.cep}} -
+                    <span class="fw-bold">Status: {{ s.get_status_display }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>Você ainda não fez nenhuma solicitação de endereço.</p>
+            {% endif %}
+        </div>
+        <div class="col-md-6">
+            <h4>Alterações Bancárias</h4>
+            {% if solicitacoes_bancarias %}
+            <ul class="list-group">
+                {% for s in solicitacoes_bancarias %}
+                <li class="list-group-item">
+                    {{ s.data_solicitacao|date:"d/m/Y" }}: Alterar para Banco {{s.banco}}, Ag. {{s.agencia}}, Conta {{s.conta}} -
+                    <span class="fw-bold">Status: {{ s.get_status_display }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>Você ainda não fez nenhuma solicitação bancária.</p>
+            {% endif %}
+        </div>
+        <div class="col-md-12 mt-3">
+            <h4>Solicitações de Abono</h4>
+            {% if solicitacoes_abono %}
+            <ul class="list-group">
+                {% for s in solicitacoes_abono %}
+                <li class="list-group-item">
+                    {{ s.data_solicitacao|date:"d/m/Y" }}: {{ s.get_tipo_abono_display }} de {{ s.data_inicio|date:"d/m/Y H:i" }} até {{ s.data_fim|date:"d/m/Y H:i" }} -
+                    <span class="fw-bold">Status: {{ s.get_status_display }}</span>
+                    {% if s.documento %}
+                        <a href="{{ s.documento.url }}" target="_blank" class="small">(Ver Anexo)</a>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p>Você ainda não fez nenhuma solicitação de abono.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const cepInput = document.getElementById('id_cep');
+        if (cepInput) {
+            cepInput.addEventListener('blur', function () {
+                const cep = this.value.replace(/\D/g, '');
+                if (cep.length === 8) {
+                    fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                        .then((response) => response.json())
+                        .then((data) => {
+                            if (!data.erro) {
+                                document.getElementById('id_rua').value = data.logradouro;
+                                document.getElementById('id_bairro').value = data.bairro;
+                                document.getElementById('id_cidade').value = data.localidade;
+                                document.getElementById('id_estado').value = data.uf;
+                            } else {
+                                alert('CEP não encontrado.');
+                            }
+                        })
+                        .catch((error) => console.error('Erro ao buscar CEP:', error));
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

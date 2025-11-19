@@ -60,7 +60,6 @@ class CustomPasswordChangeView(PasswordChangeView):
 @login_required
 def supervisor_dashboard_view(request):
     user = request.user
-    # Redireciona se não for superuser e não tiver a permissão necessária
     if not user.is_superuser and not user.has_perm("funcionarios.view_funcionario"):
         return redirect("funcionarios:home")
 
@@ -69,11 +68,9 @@ def supervisor_dashboard_view(request):
     solicitacoes_horario_pendentes = SolicitacaoHorario.objects.filter(status="PENDENTE")
     solicitacoes_abono_pendentes = SolicitacaoAbono.objects.filter(status="PENDENTE")
 
-    # Se não for analista de RH, filtra pela equipe do supervisor
     if not is_analista_rh:
         supervisor_logado = user.funcionario
         equipe_ids = supervisor_logado.equipe.values_list("id", flat=True)
-        
         solicitacoes_horario_pendentes = solicitacoes_horario_pendentes.filter(
             funcionario_id__in=equipe_ids
         )
@@ -82,7 +79,7 @@ def supervisor_dashboard_view(request):
         )
 
     context = {
-        "supervisor": user.funcionario, # Mantém o contexto para a saudação no template
+        "supervisor": user.funcionario,
         "solicitacoes_horario_pendentes": solicitacoes_horario_pendentes,
         "solicitacoes_abono_pendentes": solicitacoes_abono_pendentes,
     }
@@ -94,66 +91,28 @@ def home_view(request):
     funcionario = request.user.funcionario
 
     def sincronizar_status_operacional(func):
-        """
-        Verifica o último registro de ponto do dia e atualiza o status_operacional
-        do funcionário se ele estiver inconsistente.
-        """
         agora = timezone.now()
         inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
-
         ultimo_registro = RegistroPonto.objects.filter(
             funcionario=func,
             timestamp__gte=inicio_do_dia
         ).order_by('-timestamp').first()
-
-        novo_status = 'OFFLINE'  # Padrão
+        novo_status = 'OFFLINE'
         if ultimo_registro:
             if ultimo_registro.tipo == 'ENTRADA' or ultimo_registro.tipo.startswith('VOLTA_'):
                 novo_status = 'DISPONIVEL'
             elif ultimo_registro.tipo.startswith('SAIDA_'):
                 novo_status = 'EM_PAUSA'
-            # Se for SAIDA, o status já é OFFLINE
-
         if func.status_operacional != novo_status:
             func.status_operacional = novo_status
             func.save(update_fields=['status_operacional'])
 
-    # Garante que o status do funcionário está correto ao carregar a home
     sincronizar_status_operacional(funcionario)
 
-    form_endereco = SolicitacaoAlteracaoEnderecoForm()
-    form_bancario = SolicitacaoAlteracaoBancariaForm()
-
-    if request.method == "POST":
-        if "submit_endereco" in request.POST:
-            form_endereco = SolicitacaoAlteracaoEnderecoForm(request.POST)
-            if form_endereco.is_valid():
-                solicitacao = form_endereco.save(commit=False)
-                solicitacao.funcionario = funcionario
-                solicitacao.save()
-                messages.success(
-                    request,
-                    "Sua solicitação de alteração de endereço foi enviada para aprovação!",
-                )
-                return redirect("funcionarios:home")
-        elif "submit_bancario" in request.POST:
-            form_bancario = SolicitacaoAlteracaoBancariaForm(request.POST)
-            if form_bancario.is_valid():
-                solicitacao = form_bancario.save(commit=False)
-                solicitacao.funcionario = funcionario
-                solicitacao.save()
-                messages.success(
-                    request,
-                    "Sua solicitação de alteração bancária foi enviada para aprovação!",
-                )
-                return redirect("funcionarios:home")
-
-    # --- LÓGICA DE DADOS PARA O TEMPLATE ---
     agora = timezone.now()
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
     fim_do_dia = agora.replace(hour=23, minute=59, second=59, microsecond=999999)
 
-    # --- LÓGICA DE PAUSAS (ATUALIZADA) ---
     pausas_hoje_count = RegistroPonto.objects.filter(
         funcionario=funcionario,
         tipo="SAIDA_PAUSA",
@@ -163,16 +122,14 @@ def home_view(request):
     proxima_pausa_regra = None
     if funcionario.cargo:
         try:
-            # Busca a regra da próxima pausa na sequência
             proxima_pausa_regra = RegraDePausa.objects.get(
                 cargo=funcionario.cargo, ordem=pausas_hoje_count + 1
             )
         except RegraDePausa.DoesNotExist:
-            proxima_pausa_regra = None  # Não há mais pausas disponíveis
+            proxima_pausa_regra = None
 
     ultima_pausa = None
-    hora_fim_pausa = None  # Variável para o countdown
-
+    hora_fim_pausa = None
     if funcionario.status_operacional == "EM_PAUSA":
         ultima_pausa = (
             RegistroPonto.objects.filter(
@@ -183,10 +140,7 @@ def home_view(request):
             .order_by("-timestamp")
             .first()
         )
-
-        # Lógica para calcular o fim da pausa para o countdown
         if ultima_pausa and ultima_pausa.tipo == "SAIDA_PAUSA" and funcionario.cargo:
-            # O pausas_hoje_count já nos diz qual é a ordem da pausa atual
             try:
                 regra_pausa_atual = RegraDePausa.objects.get(
                     cargo=funcionario.cargo, ordem=pausas_hoje_count
@@ -195,9 +149,76 @@ def home_view(request):
                     minutes=regra_pausa_atual.duracao_minutos
                 )
             except RegraDePausa.DoesNotExist:
-                pass  # Se não encontrar regra, não haverá countdown
+                pass
 
-    # Lógica de Escala e Banco de Horas
+    ultimo_ponto_entrada = RegistroPonto.objects.filter(
+        funcionario=funcionario,
+        tipo='ENTRADA',
+        timestamp__date=agora.date()
+    ).order_by('-timestamp').first()
+
+    context = {
+        "funcionario_data": funcionario,
+        "proxima_pausa_regra": proxima_pausa_regra,
+        "ultima_pausa": ultima_pausa,
+        "hora_fim_pausa": hora_fim_pausa.isoformat() if hora_fim_pausa else None,
+        "ultimo_ponto_entrada": ultimo_ponto_entrada,
+    }
+    return render(request, "funcionarios/home.html", context)
+
+
+@login_required
+def meu_perfil_view(request):
+    funcionario = request.user.funcionario
+    form_endereco = SolicitacaoAlteracaoEnderecoForm(instance=funcionario)
+    form_bancario = SolicitacaoAlteracaoBancariaForm(instance=funcionario)
+
+    if request.method == "POST":
+        if "submit_endereco" in request.POST:
+            form_endereco = SolicitacaoAlteracaoEnderecoForm(request.POST, instance=funcionario)
+            if form_endereco.is_valid():
+                solicitacao, created = SolicitacaoAlteracaoEndereco.objects.update_or_create(
+                    funcionario=funcionario, status='P',
+                    defaults=form_endereco.cleaned_data
+                )
+                if created:
+                    messages.success(request, "Sua solicitação de alteração de endereço foi enviada!")
+                else:
+                    messages.warning(request, "Você já tem uma solicitação de endereço pendente. Atualizamos com os novos dados.")
+                return redirect("funcionarios:meu_perfil")
+        elif "submit_bancario" in request.POST:
+            form_bancario = SolicitacaoAlteracaoBancariaForm(request.POST, instance=funcionario)
+            if form_bancario.is_valid():
+                solicitacao, created = SolicitacaoAlteracaoBancaria.objects.update_or_create(
+                    funcionario=funcionario, status='P',
+                    defaults=form_bancario.cleaned_data
+                )
+                if created:
+                    messages.success(request, "Sua solicitação de alteração bancária foi enviada!")
+                else:
+                    messages.warning(request, "Você já tem uma solicitação bancária pendente. Atualizamos com os novos dados.")
+                return redirect("funcionarios:meu_perfil")
+
+    solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(funcionario=funcionario).order_by("-data_solicitacao")
+    solicitacoes_bancarias = SolicitacaoAlteracaoBancaria.objects.filter(funcionario=funcionario).order_by("-data_solicitacao")
+    solicitacoes_abono = SolicitacaoAbono.objects.filter(funcionario=funcionario).order_by("-data_solicitacao")
+
+    context = {
+        "form_endereco": form_endereco,
+        "form_bancario": form_bancario,
+        "solicitacoes_endereco": solicitacoes_endereco,
+        "solicitacoes_bancarias": solicitacoes_bancarias,
+        "solicitacoes_abono": solicitacoes_abono,
+        "funcionario_data": funcionario,
+    }
+    return render(request, "funcionarios/meu_perfil.html", context)
+
+
+@login_required
+def minha_jornada_view(request):
+    funcionario = request.user.funcionario
+    agora = timezone.now()
+
     escala_atual = (
         FuncionarioEscala.objects.filter(
             funcionario=funcionario, data_inicio__lte=agora.date()
@@ -215,29 +236,8 @@ def home_view(request):
     saldo_horas = int(saldo_total_minutos // 60)
     saldo_minutos_restantes = int(saldo_total_minutos % 60)
 
-    # Lógica de Solicitações
-    solicitacoes_endereco = SolicitacaoAlteracaoEndereco.objects.filter(
-        funcionario=funcionario
-    ).order_by("-data_solicitacao")
-    solicitacoes_bancarias = SolicitacaoAlteracaoBancaria.objects.filter(
-        funcionario=funcionario
-    ).order_by("-data_solicitacao")
-    solicitacoes_abono = SolicitacaoAbono.objects.filter(
-        funcionario=funcionario
-    ).order_by("-data_solicitacao")
-
-    # Lógica de Ponto
-    ultimo_ponto_entrada = RegistroPonto.objects.filter(
-        funcionario=funcionario,
-        tipo='ENTRADA',
-        timestamp__date=agora.date()
-    ).order_by('-timestamp').first()
-
     def formatar_dias_semana(dias_str):
-        dias_map = {
-            '0': 'Seg', '1': 'Ter', '2': 'Qua', '3': 'Qui',
-            '4': 'Sex', '5': 'Sáb', '6': 'Dom'
-        }
+        dias_map = {'0': 'Seg', '1': 'Ter', '2': 'Qua', '3': 'Qui', '4': 'Sex', '5': 'Sáb', '6': 'Dom'}
         if not dias_str:
             return "N/A"
         dias_list = [dias_map.get(d.strip(), '') for d in dias_str.split(',')]
@@ -248,22 +248,13 @@ def home_view(request):
         dias_de_trabalho = formatar_dias_semana(escala_atual.escala.dias_semana)
 
     context = {
-        "funcionario_data": funcionario,
-        "form_endereco": form_endereco,
-        "form_bancario": form_bancario,
-        "solicitacoes_endereco": solicitacoes_endereco,
-        "solicitacoes_bancarias": solicitacoes_bancarias,
-        "solicitacoes_abono": solicitacoes_abono,
-        "proxima_pausa_regra": proxima_pausa_regra,
-        "ultima_pausa": ultima_pausa,
-        "hora_fim_pausa": hora_fim_pausa.isoformat() if hora_fim_pausa else None,
         "escala_atual": escala_atual,
         "dias_de_trabalho": dias_de_trabalho,
         "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",
         "saldo_banco_horas_negativo": saldo_total_minutos < 0,
-        "ultimo_ponto_entrada": ultimo_ponto_entrada,
+        "funcionario_data": funcionario,
     }
-    return render(request, "funcionarios/home.html", context)
+    return render(request, "funcionarios/minha_jornada.html", context)
 
 
 @login_required
@@ -277,7 +268,6 @@ def bate_ponto_view(request):
         messages.error(request, "Você precisa selecionar um tipo de registro.")
         return redirect("funcionarios:home")
 
-    # --- VALIDAÇÃO DE ENTRADA/SAÍDA ÚNICA POR DIA ---
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
 
     if tipo_ponto == "ENTRADA":
@@ -302,9 +292,6 @@ def bate_ponto_view(request):
             messages.error(request, "Você já registrou uma saída hoje.")
             return redirect("funcionarios:home")
 
-    # --- VALIDAÇÃO DE LÓGICA DE PONTO ---
-
-    # Não pode bater ponto se estiver desligado, de férias, etc.
     if funcionario.status != "ATIVO":
         messages.error(
             request,
@@ -312,7 +299,6 @@ def bate_ponto_view(request):
         )
         return redirect("funcionarios:home")
 
-    # Validações de Entrada
     if tipo_ponto == "ENTRADA":
         if funcionario.status_operacional != "OFFLINE":
             messages.error(
@@ -339,15 +325,11 @@ def bate_ponto_view(request):
                 )
                 return redirect("funcionarios:home")
 
-            # Validação para não bater ponto em dia de folga
-            dia_da_semana = data_local.weekday()  # Segunda = 0, Domingo = 6
+            dia_da_semana = data_local.weekday()
             if str(dia_da_semana) not in escala_atual.escala.dias_semana.split(","):
                 messages.error(request, "Você não pode registrar o ponto em um dia de folga.")
                 return redirect("funcionarios:home")
 
-            # ... (resto da lógica de janela de horário)
-
-    # Validações de Pausa
     if tipo_ponto == "SAIDA_PAUSA":
         if funcionario.status_operacional != "DISPONIVEL":
             messages.error(
@@ -355,14 +337,11 @@ def bate_ponto_view(request):
             )
             return redirect("funcionarios:home")
 
-        # Validação da regra de pausa sequencial
-        inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
         pausas_hoje_count = RegistroPonto.objects.filter(
             funcionario=funcionario, tipo="SAIDA_PAUSA", timestamp__gte=inicio_do_dia
         ).count()
 
         try:
-            # Apenas verifica se a próxima regra existe. Não precisa usar a variável.
             RegraDePausa.objects.get(cargo=funcionario.cargo, ordem=pausas_hoje_count + 1)
         except RegraDePausa.DoesNotExist:
             messages.error(
@@ -378,14 +357,13 @@ def bate_ponto_view(request):
             )
             return redirect("funcionarios:home")
 
-    if tipo_ponto in ["VOLTA_PAUSA", "VOLTA_PAUSA_PESSOAL"]:
+    if tipo_ponto in ["VOLTA_PAUSA", "VOLTA_PAUSA_PESSOAL", "VOLTA_ALMOCO"]:
         if funcionario.status_operacional != "EM_PAUSA":
             messages.error(
                 request, f"Você só pode voltar de uma pausa se estiver 'Em Pausa'."
             )
             return redirect("funcionarios:home")
 
-    # Validações de Saída
     if tipo_ponto == "SAIDA":
         if funcionario.status_operacional not in ["DISPONIVEL", "EM_PAUSA"]:
             messages.error(
@@ -394,9 +372,6 @@ def bate_ponto_view(request):
             )
             return redirect("funcionarios:home")
 
-    # --- FIM DA VALIDAÇÃO ---
-
-    # Mapeia o tipo de ponto para o novo status
     status_map = {
         "ENTRADA": "DISPONIVEL",
         "SAIDA_PAUSA": "EM_PAUSA",
@@ -434,7 +409,6 @@ def solicitar_horario_view(request):
             return redirect("funcionarios:home")
     else:
         form = SolicitacaoHorarioForm()
-
     context = {"form": form}
     return render(request, "funcionarios/solicitar_horario.html", context)
 
@@ -443,10 +417,8 @@ def solicitar_horario_view(request):
 def solicitar_abono_view(request):
     funcionario = request.user.funcionario
     hoje = timezone.now().date()
-    # A busca começa no máximo 30 dias atrás, ou na data de contratação.
     data_inicio_busca = max(hoje - timedelta(days=30), funcionario.data_contratacao)
 
-    # Otimiza a busca por registros de ponto e abonos já solicitados
     datas_com_registro = set(
         RegistroPonto.objects.filter(
             funcionario=funcionario, timestamp__date__gte=data_inicio_busca
@@ -466,14 +438,12 @@ def solicitar_abono_view(request):
     for i in range(dias_a_verificar + 1):
         data_atual = data_inicio_busca + timedelta(days=i)
 
-        # Pula se já existe registro de ponto ou abono pendente para o dia
         if (
             data_atual in datas_com_registro
             or data_atual in datas_com_abono_pendente
         ):
             continue
 
-        # Encontra a escala específica para o dia que está sendo verificado
         escala_do_dia = (
             FuncionarioEscala.objects.filter(
                 funcionario=funcionario, data_inicio__lte=data_atual
@@ -483,7 +453,7 @@ def solicitar_abono_view(request):
         )
 
         if not escala_do_dia:
-            continue  # Se não tinha escala no dia, não é uma falta
+            continue
 
         dias_de_trabalho = [int(d) for d in escala_do_dia.escala.dias_semana.split(",")]
         if data_atual.weekday() in dias_de_trabalho:
@@ -503,12 +473,10 @@ def solicitar_abono_view(request):
             return redirect("funcionarios:home")
     else:
         form = SolicitacaoAbonoForm(request=request)
-
     context = {"form": form, "faltas": faltas_nao_justificadas}
     return render(request, "funcionarios/solicitar_abono.html", context)
 
 
-# --- NOVA VIEW PARA SERVIR A TABELA VIA HTMX ---
 @login_required
 def tabela_equipe_view(request):
     supervisor = request.user.funcionario
@@ -561,30 +529,23 @@ def relatorio_folha_ponto(request):
     def _calculate_worked_hours(registros):
         if not registros:
             return 0
-
         entrada = next((r for r in registros if r.tipo == 'ENTRADA'), None)
         saida = next((r for r in reversed(registros) if r.tipo == 'SAIDA'), None)
-
         if not entrada or not saida:
             return 0
-
         jornada_bruta_minutos = (saida.timestamp - entrada.timestamp).total_seconds() / 60
-
         def _calculate_break_time(registros_break, tipo_saida, tipo_volta):
             saidas = [r for r in registros_break if r.tipo == tipo_saida]
             voltas = [r for r in registros_break if r.tipo == tipo_volta]
             total_break_time = timedelta()
-
             for s in saidas:
                 corresponding_volta = next((v for v in voltas if v.timestamp > s.timestamp), None)
                 if corresponding_volta:
                     total_break_time += corresponding_volta.timestamp - s.timestamp
                     voltas.remove(corresponding_volta)
             return total_break_time.total_seconds() / 60
-
         minutos_pausa = _calculate_break_time(registros, 'SAIDA_PAUSA', 'VOLTA_PAUSA')
         minutos_almoco = _calculate_break_time(registros, 'SAIDA_ALMOCO', 'VOLTA_ALMOCO')
-        
         return jornada_bruta_minutos - minutos_pausa - minutos_almoco
 
     if request.method == "POST":
@@ -594,15 +555,9 @@ def relatorio_folha_ponto(request):
             data_fim = form.cleaned_data["data_fim"]
             funcionario_selecionado = form.cleaned_data["funcionario"]
             
-            # --- Validação de Permissão ---
             user = request.user
             is_analista_rh = user.groups.filter(name='Analista de RH').exists()
             is_supervisor = hasattr(user, 'funcionario') and user.funcionario.equipe.exists()
-            
-            # Um usuário só pode ver o relatório se:
-            # 1. For Analista de RH
-            # 2. For um supervisor e o funcionário selecionado for ele mesmo ou da sua equipe
-            # 3. For um funcionário comum vendo o próprio relatório
             
             pode_ver = False
             if is_analista_rh:
@@ -615,15 +570,11 @@ def relatorio_folha_ponto(request):
 
             if not pode_ver:
                 messages.error(request, "Você não tem permissão para visualizar o relatório deste funcionário.")
-                # Limpa os dados do relatório para não exibir nada
                 relatorio_data = None
-                # Retorna o formulário vazio para o usuário
                 return render(request, "funcionarios/relatorio_folha_ponto.html", {"form": form, "relatorio": relatorio_data})
 
             funcionario = funcionario_selecionado
-            # Garante que a data de fim inclua o dia inteiro
             data_fim_ajustada = datetime.combine(data_fim, datetime.max.time())
-
             registros = (
                 RegistroPonto.objects.filter(
                     funcionario=funcionario,
@@ -632,32 +583,22 @@ def relatorio_folha_ponto(request):
                 .order_by("timestamp")
                 .select_related("funcionario")
             )
-
             banco_horas = BancoDeHoras.objects.filter(
                 funcionario=funcionario, data__range=(data_inicio, data_fim)
             )
-
-            # Agrupa registros por dia
             registros_por_dia = defaultdict(list)
             for registro in registros:
                 dia = registro.timestamp.date()
                 registros_por_dia[dia].append(registro)
-
-            # Mapeia o saldo do banco de horas por dia
             banco_por_dia = {bh.data: bh for bh in banco_horas}
-
-            # Monta a estrutura final do relatório
             relatorio_data = []
             dias_no_periodo = (data_fim - data_inicio).days + 1
             for dia_offset in range(dias_no_periodo):
                 data_atual = data_inicio + timedelta(days=dia_offset)
                 saldo_bh = banco_por_dia.get(data_atual)
                 registros_do_dia = registros_por_dia.get(data_atual, [])
-                
                 total_horas_trabalhadas_minutos = _calculate_worked_hours(registros_do_dia)
-
                 status_dia = ""
-                # Lógica para identificar falta injustificada
                 escala_info = (
                     FuncionarioEscala.objects.filter(
                         funcionario=funcionario, data_inicio__lte=data_atual
@@ -665,16 +606,13 @@ def relatorio_folha_ponto(request):
                     .filter(Q(data_fim__gte=data_atual) | Q(data_fim__isnull=True))
                     .first()
                 )
-
                 is_workday = False
                 if escala_info:
-                    dia_da_semana = data_atual.weekday()  # Segunda = 0, Domingo = 6
+                    dia_da_semana = data_atual.weekday()
                     if str(dia_da_semana) in escala_info.escala.dias_semana.split(","):
                         is_workday = True
-
                 if is_workday and not registros_do_dia and not saldo_bh:
                     status_dia = "Falta Injustificada"
-
                 relatorio_data.append(
                     {
                         "data": data_atual,
@@ -684,22 +622,18 @@ def relatorio_folha_ponto(request):
                         "total_horas_trabalhadas": total_horas_trabalhadas_minutos,
                     }
                 )
-
     context = {"form": form, "relatorio": relatorio_data}
     return render(request, "funcionarios/relatorio_folha_ponto.html", context)
 
 
 @login_required
 def relatorio_equipe_view(request):
-    # Apenas supervisores podem acessar
     if not request.user.is_superuser and not request.user.funcionario.equipe.exists():
         messages.error(request, "Você não tem permissão para acessar esta página.")
         return redirect("funcionarios:home")
-
     form = RelatorioEquipeForm()
     relatorio_data = None
     totais = None
-
     if request.method == "POST":
         form = RelatorioEquipeForm(request.POST)
         if form.is_valid():
@@ -707,66 +641,49 @@ def relatorio_equipe_view(request):
             data_fim = form.cleaned_data["data_fim"]
             supervisor = request.user.funcionario
             equipe = supervisor.equipe.all() if not request.user.is_superuser else Funcionario.objects.all()
-
-
             relatorio_data = []
             total_geral_extras = 0
             total_geral_devidas = 0
             total_geral_faltas = 0
-
             for funcionario in equipe:
-                # 1. Calcular Horas Extras e Devidas a partir do Banco de Horas
                 banco_horas = BancoDeHoras.objects.filter(
                     funcionario=funcionario, data__range=(data_inicio, data_fim)
                 )
                 horas_extras_minutos = banco_horas.filter(minutos__gt=0).aggregate(total=Sum('minutos'))['total'] or 0
                 horas_devidas_minutos = banco_horas.filter(minutos__lt=0).aggregate(total=Sum('minutos'))['total'] or 0
-
-                # 2. Calcular Faltas Injustificadas
                 faltas = 0
                 dias_no_periodo = (data_fim - data_inicio).days + 1
                 for dia_offset in range(dias_no_periodo):
                     data_atual = data_inicio + timedelta(days=dia_offset)
-
-                    # Verifica se há registro de ponto ou abono aprovado para o dia
                     tem_registro = RegistroPonto.objects.filter(funcionario=funcionario, timestamp__date=data_atual).exists()
                     tem_abono = SolicitacaoAbono.objects.filter(
                         funcionario=funcionario,
                         data_inicio__date=data_atual,
                         status='APROVADO'
                     ).exists()
-
                     if tem_registro or tem_abono:
                         continue
-
-                    # Verifica se era um dia de trabalho
                     escala_info = FuncionarioEscala.objects.filter(
                         funcionario=funcionario, data_inicio__lte=data_atual
                     ).filter(Q(data_fim__gte=data_atual) | Q(data_fim__isnull=True)).first()
-
                     if escala_info:
                         dia_da_semana = data_atual.weekday()
                         if str(dia_da_semana) in escala_info.escala.dias_semana.split(","):
                             faltas += 1
-                
                 relatorio_data.append({
                     'funcionario': funcionario,
                     'horas_extras_minutos': horas_extras_minutos,
                     'horas_devidas_minutos': abs(horas_devidas_minutos),
                     'faltas': faltas,
                 })
-
                 total_geral_extras += horas_extras_minutos
                 total_geral_devidas += abs(horas_devidas_minutos)
                 total_geral_faltas += faltas
-            
             totais = {
                 'total_geral_extras_minutos': total_geral_extras,
                 'total_geral_devidas_minutos': total_geral_devidas,
                 'total_geral_faltas': total_geral_faltas,
             }
-
-
     context = {"form": form, "relatorio": relatorio_data, "totais": totais}
     return render(request, "funcionarios/relatorio_equipe.html", context)
 
@@ -829,10 +746,6 @@ def aprovar_solicitacao_abono(request, pk):
         solicitacao.analisado_por = user.funcionario
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
-
-        # A lógica de criação de registro no banco de horas foi removida.
-        # O script `processar_pontos` agora é o único responsável por essa lógica,
-        # e ele irá ignorar dias com abono de falta aprovado.
 
         messages.success(request, "A solicitação de abono foi aprovada.")
     else:

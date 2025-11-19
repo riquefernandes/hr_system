@@ -1,0 +1,51 @@
+{% extends "funcionarios/base.html" %}
+
+{% block title %}Minha Jornada{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="h2">Minha Jornada</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">Dados de Trabalho</div>
+                <div class="card-body">
+                    <p><strong>Cargo:</strong> {{ funcionario_data.cargo.nome|default:"Não informado" }}</p>
+                    <p><strong>Data de Contratação:</strong> {{ funcionario_data.data_contratacao|date:"d/m/Y" }}</p>
+                    <p><strong>Centro de Custo:</strong> {{ funcionario_data.centro_de_custo.nome|default:"Não informado" }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">Banco de Horas</div>
+                <div class="card-body text-center">
+                    <h5 class="card-title">Saldo Total</h5>
+                    <p class="fs-2 {% if saldo_banco_horas_negativo %}text-danger{% else %}text-success{% endif %} fw-bold">
+                        {{ saldo_banco_horas }}
+                    </p>
+                    <a href="{% url 'funcionarios:relatorio_folha_ponto' %}" class="btn btn-outline-primary">Ver Extrato Completo</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header">Minha Escala Atual</div>
+        <div class="card-body">
+            {% if escala_atual %}
+                <h5 class="card-title">{{ escala_atual.escala.nome }}</h5>
+                <p><strong>Horário de Entrada:</strong> {{ escala_atual.escala.horario_entrada|time:"H:i" }}</p>
+                <p><strong>Horário de Saída:</strong> {{ escala_atual.escala.horario_saida|time:"H:i" }}</p>
+                <p><strong>Intervalo de Almoço:</strong> {{ escala_atual.escala.duracao_almoco_minutos }} minutos</p>
+                <p><strong>Dias de Trabalho:</strong> {{ dias_de_trabalho }}</p>
+            {% else %}
+                <p class="text-danger">Nenhuma escala de trabalho atribuída para o período atual. Entre em contato com o RH.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

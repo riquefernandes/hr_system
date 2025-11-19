@@ -8,6 +8,8 @@ app_name = "funcionarios"
 urlpatterns = [
     path("login/", views.login_view, name="login"),
     path("home/", views.home_view, name="home"),
+    path("meu-perfil/", views.meu_perfil_view, name="meu_perfil"),
+    path("minha-jornada/", views.minha_jornada_view, name="minha_jornada"),
     path("logout/", views.logout_view, name="logout"),
     path("relatorio/", views.relatorio_folha_ponto, name="relatorio_folha_ponto"),
     # --- URL DE TROCA DE SENHA ATUALIZADA ---
