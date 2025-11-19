@@ -89,26 +89,6 @@ def supervisor_dashboard_view(request):
 @login_required
 def home_view(request):
     funcionario = request.user.funcionario
-
-    def sincronizar_status_operacional(func):
-        agora = timezone.now()
-        inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
-        ultimo_registro = RegistroPonto.objects.filter(
-            funcionario=func,
-            timestamp__gte=inicio_do_dia
-        ).order_by('-timestamp').first()
-        novo_status = 'OFFLINE'
-        if ultimo_registro:
-            if ultimo_registro.tipo == 'ENTRADA' or ultimo_registro.tipo.startswith('VOLTA_'):
-                novo_status = 'DISPONIVEL'
-            elif ultimo_registro.tipo.startswith('SAIDA_'):
-                novo_status = 'EM_PAUSA'
-        if func.status_operacional != novo_status:
-            func.status_operacional = novo_status
-            func.save(update_fields=['status_operacional'])
-
-    sincronizar_status_operacional(funcionario)
-
     agora = timezone.now()
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
     fim_do_dia = agora.replace(hour=23, minute=59, second=59, microsecond=999999)
@@ -477,14 +457,58 @@ def solicitar_abono_view(request):
     return render(request, "funcionarios/solicitar_abono.html", context)
 
 
+from django.views.decorators.cache import never_cache
+
+...
+
+@never_cache
 @login_required
 def tabela_equipe_view(request):
-    supervisor = request.user.funcionario
-    equipe = supervisor.equipe.all()
+    user = request.user
+    is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+
+    print("\n--- [tabela_equipe_view] INICIANDO POLLING ---")
+
+    if is_analista_rh:
+        equipe = Funcionario.objects.filter(status='ATIVO')
+        print("Usuário é Analista de RH, buscando todos os funcionários ativos.")
+    else:
+        supervisor = user.funcionario
+        equipe = supervisor.equipe.all()
+        print(f"Usuário é Supervisor '{supervisor.nome_completo}', buscando sua equipe.")
+        
     agora = timezone.now()
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
 
     for membro in equipe:
+        print(f"\n[Processando]: {membro.nome_completo} (ID: {membro.id})")
+        print(f"  -> Status atual no DB: '{membro.status_operacional}'")
+
+        ultimo_registro = RegistroPonto.objects.filter(
+            funcionario=membro,
+            timestamp__gte=inicio_do_dia
+        ).order_by('-timestamp').first()
+        
+        print(f"  -> Último registro de ponto do dia: {ultimo_registro}")
+
+        novo_status = 'OFFLINE'
+        if ultimo_registro:
+            if ultimo_registro.tipo == 'ENTRADA' or ultimo_registro.tipo.startswith('VOLTA_'):
+                novo_status = 'DISPONIVEL'
+            elif ultimo_registro.tipo in ['SAIDA_PAUSA', 'SAIDA_ALMOCO', 'SAIDA_PAUSA_PESSOAL']:
+                novo_status = 'EM_PAUSA'
+            elif ultimo_registro.tipo == 'SAIDA':
+                novo_status = 'OFFLINE'
+        
+        print(f"  -> Status calculado: '{novo_status}'")
+
+        if membro.status_operacional != novo_status:
+            print(f"  ==> DETECTADA DIVERGÊNCIA! Atualizando status de '{membro.status_operacional}' para '{novo_status}'.")
+            Funcionario.objects.filter(pk=membro.pk).update(status_operacional=novo_status)
+            membro.status_operacional = novo_status 
+        else:
+            print("  --> Status no DB está correto. Nenhuma ação necessária.")
+
         membro.ultima_pausa = None
         membro.limite_pausa_segundos = 0
 
@@ -517,7 +541,8 @@ def tabela_equipe_view(request):
             .filter(Q(data_fim__gte=agora.date()) | Q(data_fim__isnull=True))
             .first()
         )
-
+    
+    print("\n--- [tabela_equipe_view] FIM DO POLLING ---")
     return render(request, "funcionarios/_tabela_equipe.html", {"equipe": equipe})
 
 

@@ -2,7 +2,7 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import User
-from .models import Funcionario
+from .models import Funcionario, RegistroPonto
 import random
 from datetime import date
 from django.contrib.auth.signals import user_logged_in, user_logged_out
@@ -34,7 +34,16 @@ def criar_user_para_funcionario(sender, instance, created, **kwargs):
 
 @receiver(user_logged_out)
 def on_user_logged_out(sender, request, user, **kwargs):
-    """Quando um usuário desloga, marca seu status como Offline."""
+    """
+    Quando um usuário desloga, verifica se a jornada está aberta,
+    cria um registro de SAIDA e marca seu status como Offline.
+    """
     if hasattr(user, "funcionario"):
-        user.funcionario.status_operacional = "OFFLINE"
-        user.funcionario.save()
+        funcionario = user.funcionario
+        # Só executa a lógica se o funcionário não estiver já offline
+        if funcionario.status_operacional != "OFFLINE":
+            # Cria o registro de ponto para fechar o dia
+            RegistroPonto.objects.create(funcionario=funcionario, tipo="SAIDA")
+            # Atualiza o status
+            funcionario.status_operacional = "OFFLINE"
+            funcionario.save(update_fields=["status_operacional"])
