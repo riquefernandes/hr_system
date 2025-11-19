@@ -204,6 +204,7 @@ class BancoDeHoras(models.Model):
         ordering = ["-data"]
         verbose_name = "Registro de Banco de Horas"
         verbose_name_plural = "Registros de Banco de Horas"
+        unique_together = ["funcionario", "data"]
 
     def __str__(self):
         status = "Crédito" if self.minutos > 0 else "Débito"

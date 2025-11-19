@@ -121,23 +121,33 @@ class RelatorioFolhaPontoForm(forms.Form):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
-        if user and user.funcionario.supervisor:
-            # Se o usuário for um supervisor, ele não pode selecionar funcionários
-            self.fields["funcionario"].queryset = Funcionario.objects.filter(
-                id=user.funcionario.id
-            )
-            self.fields["funcionario"].initial = user.funcionario
-            self.fields["funcionario"].disabled = True
-        elif user and hasattr(user, "funcionario") and user.funcionario.equipe.exists():
-            # Se for um supervisor, pode escolher entre sua equipe
-            self.fields["funcionario"].queryset = user.funcionario.equipe.all()
-        elif user and hasattr(user, "funcionario"):
+        if not user or not hasattr(user, 'funcionario'):
+            # Se não houver usuário ou funcionário associado, não mostra ninguém
+            self.fields["funcionario"].queryset = Funcionario.objects.none()
+            return
+
+        is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+        is_supervisor = user.funcionario.equipe.exists()
+
+        if is_analista_rh:
+            # Analista de RH pode ver todos os funcionários ativos
+            self.fields["funcionario"].queryset = Funcionario.objects.filter(status='ATIVO')
+            self.fields["funcionario"].label = "Selecionar Funcionário"
+        
+        elif is_supervisor:
+            # Supervisor pode ver a si mesmo e sua equipe
+            self.fields["funcionario"].queryset = (
+                user.funcionario.equipe.all() | Funcionario.objects.filter(id=user.funcionario.id)
+            ).distinct()
+            self.fields["funcionario"].label = "Selecionar Membro da Equipe"
+
+        else:
             # Funcionário comum só pode ver o próprio relatório
-            self.fields["funcionario"].queryset = Funcionario.objects.filter(
-                id=user.funcionario.id
-            )
+            self_qs = Funcionario.objects.filter(id=user.funcionario.id)
+            self.fields["funcionario"].queryset = self_qs
             self.fields["funcionario"].initial = user.funcionario
             self.fields["funcionario"].widget = forms.HiddenInput()
+
 
 
 class RelatorioEquipeForm(forms.Form):

@@ -1,28 +1,21 @@
 # Usar uma imagem oficial do Python como base
 FROM python:3.11-slim
 
-# Instalar o cron
+# Instalar o cron e outras dependências
 RUN apt-get update && apt-get install -y cron
 
-# Definir variáveis de ambiente para o Python
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Criar e ativar o ambiente virtual
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Criar um diretório de trabalho dentro do container
+# Copiar apenas os arquivos de dependência primeiro para aproveitar o cache do Docker
+COPY requirements.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Copiar o resto do código da aplicação
+COPY . /app
 WORKDIR /app
 
-# Copiar o arquivo de dependências
-COPY requirements.txt /app/
-
-# Instalar as dependências
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copiar o resto do código do projeto para o diretório de trabalho
-COPY . /app/
-
-# Dar permissão de execução para o script
-RUN chmod +x /app/scripts/run_processar_pontos.sh
-
-# Adicionar o crontab
+# Adicionar o crontab e definir as permissões corretas
 COPY scripts/crontab /etc/cron.d/processar-pontos-cron
-RUN crontab /etc/cron.d/processar-pontos-cron
+RUN chmod 0644 /etc/cron.d/processar-pontos-cron

@@ -1,1 +1,11 @@
-0 1 * * * /app/scripts/run_processar_pontos.sh >> /var/log/cron.log 2>&1
+# Define o ambiente para os jobs do cron
+PATH=/opt/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+DB_HOST=db
+DB_NAME=sistema_rh_db
+DB_USER=admin
+DB_PASS=admin123
+DB_PORT=5432
+
+# Executa o comando a cada 2 minutos, adicionando um timestamp ao log
+*/2 * * * * root sh -c 'echo "--- Cron job executado em: $(date) ---" && python3 /app/manage.py processar_pontos' >> /proc/1/fd/1 2>> /proc/1/fd/2
+

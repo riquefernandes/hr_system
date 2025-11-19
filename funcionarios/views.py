@@ -59,25 +59,30 @@ class CustomPasswordChangeView(PasswordChangeView):
 
 @login_required
 def supervisor_dashboard_view(request):
-    if (
-        not request.user.has_perm("funcionarios.view_funcionario")
-        and not request.user.is_superuser
-    ):
+    user = request.user
+    # Redireciona se não for superuser e não tiver a permissão necessária
+    if not user.is_superuser and not user.has_perm("funcionarios.view_funcionario"):
         return redirect("funcionarios:home")
 
-    supervisor_logado = request.user.funcionario
-    equipe_ids = supervisor_logado.equipe.values_list("id", flat=True)
+    is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+    
+    solicitacoes_horario_pendentes = SolicitacaoHorario.objects.filter(status="PENDENTE")
+    solicitacoes_abono_pendentes = SolicitacaoAbono.objects.filter(status="PENDENTE")
 
-    # Busca as solicitações pendentes dos funcionários da equipe
-    solicitacoes_horario_pendentes = SolicitacaoHorario.objects.filter(
-        funcionario_id__in=equipe_ids, status="PENDENTE"
-    )
-    solicitacoes_abono_pendentes = SolicitacaoAbono.objects.filter(
-        funcionario_id__in=equipe_ids, status="PENDENTE"
-    )
+    # Se não for analista de RH, filtra pela equipe do supervisor
+    if not is_analista_rh:
+        supervisor_logado = user.funcionario
+        equipe_ids = supervisor_logado.equipe.values_list("id", flat=True)
+        
+        solicitacoes_horario_pendentes = solicitacoes_horario_pendentes.filter(
+            funcionario_id__in=equipe_ids
+        )
+        solicitacoes_abono_pendentes = solicitacoes_abono_pendentes.filter(
+            funcionario_id__in=equipe_ids
+        )
 
     context = {
-        "supervisor": supervisor_logado,
+        "supervisor": user.funcionario, # Mantém o contexto para a saudação no template
         "solicitacoes_horario_pendentes": solicitacoes_horario_pendentes,
         "solicitacoes_abono_pendentes": solicitacoes_abono_pendentes,
     }
@@ -587,8 +592,35 @@ def relatorio_folha_ponto(request):
         if form.is_valid():
             data_inicio = form.cleaned_data["data_inicio"]
             data_fim = form.cleaned_data["data_fim"]
-            funcionario = form.cleaned_data["funcionario"]
+            funcionario_selecionado = form.cleaned_data["funcionario"]
+            
+            # --- Validação de Permissão ---
+            user = request.user
+            is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+            is_supervisor = hasattr(user, 'funcionario') and user.funcionario.equipe.exists()
+            
+            # Um usuário só pode ver o relatório se:
+            # 1. For Analista de RH
+            # 2. For um supervisor e o funcionário selecionado for ele mesmo ou da sua equipe
+            # 3. For um funcionário comum vendo o próprio relatório
+            
+            pode_ver = False
+            if is_analista_rh:
+                pode_ver = True
+            elif is_supervisor:
+                if funcionario_selecionado == user.funcionario or user.funcionario.equipe.filter(id=funcionario_selecionado.id).exists():
+                    pode_ver = True
+            elif funcionario_selecionado == user.funcionario:
+                pode_ver = True
 
+            if not pode_ver:
+                messages.error(request, "Você não tem permissão para visualizar o relatório deste funcionário.")
+                # Limpa os dados do relatório para não exibir nada
+                relatorio_data = None
+                # Retorna o formulário vazio para o usuário
+                return render(request, "funcionarios/relatorio_folha_ponto.html", {"form": form, "relatorio": relatorio_data})
+
+            funcionario = funcionario_selecionado
             # Garante que a data de fim inclua o dia inteiro
             data_fim_ajustada = datetime.combine(data_fim, datetime.max.time())
 
@@ -747,12 +779,14 @@ def logout_view(request):
 @login_required
 def aprovar_solicitacao_horario(request, pk):
     solicitacao = get_object_or_404(SolicitacaoHorario, pk=pk)
-    supervisor = request.user.funcionario
+    user = request.user
+    
+    is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+    is_supervisor_direto = hasattr(user, 'funcionario') and solicitacao.funcionario.supervisor == user.funcionario
 
-    # Garante que apenas o supervisor direto do funcionário pode aprovar
-    if solicitacao.funcionario.supervisor == supervisor:
+    if is_analista_rh or is_supervisor_direto:
         solicitacao.status = "APROVADO"
-        solicitacao.analisado_por = supervisor
+        solicitacao.analisado_por = user.funcionario
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
         messages.success(request, "A solicitação foi aprovada com sucesso.")
@@ -765,12 +799,14 @@ def aprovar_solicitacao_horario(request, pk):
 @login_required
 def recusar_solicitacao_horario(request, pk):
     solicitacao = get_object_or_404(SolicitacaoHorario, pk=pk)
-    supervisor = request.user.funcionario
+    user = request.user
 
-    # Garante que apenas o supervisor direto do funcionário pode recusar
-    if solicitacao.funcionario.supervisor == supervisor:
+    is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+    is_supervisor_direto = hasattr(user, 'funcionario') and solicitacao.funcionario.supervisor == user.funcionario
+
+    if is_analista_rh or is_supervisor_direto:
         solicitacao.status = "RECUSADO"
-        solicitacao.analisado_por = supervisor
+        solicitacao.analisado_por = user.funcionario
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
         messages.success(request, "A solicitação foi recusada.")
@@ -783,11 +819,14 @@ def recusar_solicitacao_horario(request, pk):
 @login_required
 def aprovar_solicitacao_abono(request, pk):
     solicitacao = get_object_or_404(SolicitacaoAbono, pk=pk)
-    supervisor = request.user.funcionario
+    user = request.user
 
-    if solicitacao.funcionario.supervisor == supervisor:
+    is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+    is_supervisor_direto = hasattr(user, 'funcionario') and solicitacao.funcionario.supervisor == user.funcionario
+
+    if is_analista_rh or is_supervisor_direto:
         solicitacao.status = "APROVADO"
-        solicitacao.analisado_por = supervisor
+        solicitacao.analisado_por = user.funcionario
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
 
@@ -812,11 +851,14 @@ def aprovar_solicitacao_abono(request, pk):
 @login_required
 def recusar_solicitacao_abono(request, pk):
     solicitacao = get_object_or_404(SolicitacaoAbono, pk=pk)
-    supervisor = request.user.funcionario
+    user = request.user
 
-    if solicitacao.funcionario.supervisor == supervisor:
+    is_analista_rh = user.groups.filter(name='Analista de RH').exists()
+    is_supervisor_direto = hasattr(user, 'funcionario') and solicitacao.funcionario.supervisor == user.funcionario
+
+    if is_analista_rh or is_supervisor_direto:
         solicitacao.status = "RECUSADO"
-        solicitacao.analisado_por = supervisor
+        solicitacao.analisado_por = user.funcionario
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
         messages.success(request, "A solicitação de abono foi recusada.")
