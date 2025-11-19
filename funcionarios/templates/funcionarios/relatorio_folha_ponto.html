@@ -1,4 +1,5 @@
 {% extends "funcionarios/base.html" %}
+{% load custom_filters %}
 
 {% block title %}Relatório de Folha de Ponto{% endblock %}
 
@@ -41,17 +42,21 @@
                             <tr>
                                 <th>Data</th>
                                 <th>Marcações</th>
-                                <th>Saldo do Dia (Banco de Horas)</th>
+                                <th>Total Trabalhado</th>
+                                <th>Ocorrências / Saldo</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for dia in relatorio %}
                             <tr class="{% if dia.status == 'Falta Injustificada' %}table-danger{% endif %}">
                                 <td>{{ dia.data|date:"d/m/Y" }} ({{ dia.data|date:"l" }})</td>
-                                
+
                                 {% if dia.status == 'Falta Injustificada' %}
-                                    <td colspan="2" class="text-center fw-bold">
+                                    <td colspan="3" class="text-center fw-bold">
                                         {{ dia.status }}
+                                        {% if dia.saldo_bh %}
+                                            <span class="text-danger">({{ dia.saldo_bh.minutos|format_minutes }}h)</span>
+                                        {% endif %}
                                     </td>
                                 {% else %}
                                     <td>
@@ -62,13 +67,17 @@
                                         {% endfor %}
                                     </td>
                                     <td>
-                                        {% if dia.saldo_bh %}
+                                        <span class="fw-bold">{{ dia.total_horas_trabalhadas|format_minutes }}h</span>
+                                    </td>
+                                    <td>
+                                        {% if dia.saldo_bh and dia.saldo_bh.minutos != 0 %}
                                             <span class="{% if dia.saldo_bh.minutos < 0 %}text-danger{% else %}text-success{% endif %}">
-                                                {{ dia.saldo_bh.minutos }} minutos
+                                                <strong>{{ dia.saldo_bh.descricao }}:</strong> {{ dia.saldo_bh.minutos|format_minutes }}h
                                             </span>
-                                            <small class="text-muted">({{ dia.saldo_bh.descricao }})</small>
+                                        {% elif dia.registros %}
+                                            <span class="text-muted">Jornada cumprida</span>
                                         {% else %}
-                                            <span class="text-muted">Não processado</span>
+                                             <span class="text-muted">Não processado</span>
                                         {% endif %}
                                     </td>
                                 {% endif %}

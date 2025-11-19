@@ -553,6 +553,35 @@ def relatorio_folha_ponto(request):
     form = RelatorioFolhaPontoForm(user=request.user)
     relatorio_data = None
 
+    def _calculate_worked_hours(registros):
+        if not registros:
+            return 0
+
+        entrada = next((r for r in registros if r.tipo == 'ENTRADA'), None)
+        saida = next((r for r in reversed(registros) if r.tipo == 'SAIDA'), None)
+
+        if not entrada or not saida:
+            return 0
+
+        jornada_bruta_minutos = (saida.timestamp - entrada.timestamp).total_seconds() / 60
+
+        def _calculate_break_time(registros_break, tipo_saida, tipo_volta):
+            saidas = [r for r in registros_break if r.tipo == tipo_saida]
+            voltas = [r for r in registros_break if r.tipo == tipo_volta]
+            total_break_time = timedelta()
+
+            for s in saidas:
+                corresponding_volta = next((v for v in voltas if v.timestamp > s.timestamp), None)
+                if corresponding_volta:
+                    total_break_time += corresponding_volta.timestamp - s.timestamp
+                    voltas.remove(corresponding_volta)
+            return total_break_time.total_seconds() / 60
+
+        minutos_pausa = _calculate_break_time(registros, 'SAIDA_PAUSA', 'VOLTA_PAUSA')
+        minutos_almoco = _calculate_break_time(registros, 'SAIDA_ALMOCO', 'VOLTA_ALMOCO')
+        
+        return jornada_bruta_minutos - minutos_pausa - minutos_almoco
+
     if request.method == "POST":
         form = RelatorioFolhaPontoForm(request.POST, user=request.user)
         if form.is_valid():
@@ -592,6 +621,8 @@ def relatorio_folha_ponto(request):
                 data_atual = data_inicio + timedelta(days=dia_offset)
                 saldo_bh = banco_por_dia.get(data_atual)
                 registros_do_dia = registros_por_dia.get(data_atual, [])
+                
+                total_horas_trabalhadas_minutos = _calculate_worked_hours(registros_do_dia)
 
                 status_dia = ""
                 # Lógica para identificar falta injustificada
@@ -618,6 +649,7 @@ def relatorio_folha_ponto(request):
                         "registros": registros_do_dia,
                         "saldo_bh": saldo_bh,
                         "status": status_dia,
+                        "total_horas_trabalhadas": total_horas_trabalhadas_minutos,
                     }
                 )
 

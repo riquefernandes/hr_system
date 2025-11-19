@@ -2,7 +2,8 @@
 # funcionarios/management/commands/processar_pontos.py
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from datetime import timedelta, datetime, time
+from datetime import timedelta, datetime, time, date
+from django.db import models
 from funcionarios.models import Funcionario, RegistroPonto, FuncionarioEscala, BancoDeHoras
 
 class Command(BaseCommand):
@@ -63,8 +64,28 @@ class Command(BaseCommand):
         ).order_by('timestamp')
 
         if not registros.exists():
-            # TODO: Lógica para falta injustificada
-            self.stdout.write(f"  - [AVISO] Nenhum registro de ponto para {funcionario.nome_completo}.")
+            # Lógica para falta injustificada
+            # Se for um dia de trabalho e não há registros, é uma falta.
+            carga_horaria_bruta_esperada = (
+                datetime.combine(target_date, escala.horario_saida) - 
+                datetime.combine(target_date, escala.horario_entrada)
+            ).total_seconds() / 60
+            
+            if escala.horario_saida < escala.horario_entrada: # Turno noturno
+                carga_horaria_bruta_esperada += 24 * 60
+
+            carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - escala.duracao_almoco_minutos
+            
+            # Cria o registro negativo no banco de horas
+            BancoDeHoras.objects.update_or_create(
+                funcionario=funcionario,
+                data=target_date,
+                defaults={
+                    'minutos': -carga_horaria_bruta_esperada,
+                    'descricao': 'Falta Injustificada'
+                }
+            )
+            self.stdout.write(f"  - [FALTA] Falta injustificada para {funcionario.nome_completo}.")
             return
 
         # 3. Calcular horas trabalhadas e pausas
