@@ -830,16 +830,9 @@ def aprovar_solicitacao_abono(request, pk):
         solicitacao.data_analise = timezone.now()
         solicitacao.save()
 
-        # Lógica para criar o registro no banco de horas
-        minutos_abonados = (solicitacao.data_fim - solicitacao.data_inicio).total_seconds() / 60
-
-        if minutos_abonados > 0:
-            BancoDeHoras.objects.create(
-                funcionario=solicitacao.funcionario,
-                data=solicitacao.data_inicio.date(),
-                minutos=minutos_abonados,
-                descricao=f"Abono aprovado: {solicitacao.motivo}",
-            )
+        # A lógica de criação de registro no banco de horas foi removida.
+        # O script `processar_pontos` agora é o único responsável por essa lógica,
+        # e ele irá ignorar dias com abono de falta aprovado.
 
         messages.success(request, "A solicitação de abono foi aprovada.")
     else:

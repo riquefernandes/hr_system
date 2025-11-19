@@ -4,7 +4,7 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 from datetime import timedelta, datetime, time, date
 from django.db import models
-from funcionarios.models import Funcionario, RegistroPonto, FuncionarioEscala, BancoDeHoras
+from funcionarios.models import Funcionario, RegistroPonto, FuncionarioEscala, BancoDeHoras, SolicitacaoAbono
 
 class Command(BaseCommand):
     help = "Processa os registros de ponto para calcular o banco de horas dos funcionários."
@@ -37,6 +37,18 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Processamento concluído."))
 
     def process_employee(self, funcionario, target_date):
+        # 0. Verificar se há abono de falta aprovado para o dia
+        if SolicitacaoAbono.objects.filter(
+            funcionario=funcionario,
+            data_inicio__date=target_date,
+            status='APROVADO',
+            tipo_abono='FALTA'
+        ).exists():
+            self.stdout.write(f"  - [INFO] Dia com abono de falta aprovado para {funcionario.nome_completo}. Pulando...")
+            # Garante que o saldo para o dia seja zero, removendo qualquer registro pré-existente.
+            BancoDeHoras.objects.filter(funcionario=funcionario, data=target_date).delete()
+            return
+
         # 1. Encontrar a escala do funcionário para o dia
         escala_info = FuncionarioEscala.objects.filter(
             funcionario=funcionario,
