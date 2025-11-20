@@ -69,11 +69,18 @@ class Command(BaseCommand):
             self.stdout.write(f"  - [INFO] Dia de folga para {funcionario.nome_completo}. Pulando...")
             return
 
-        # 2. Obter registros de ponto do dia
+        # 2. Obter registros de ponto do dia (usando filtro de intervalo de tempo localizado)
+        current_timezone = timezone.get_current_timezone()
+        start_of_day_local = datetime.combine(target_date, time.min, tzinfo=current_timezone)
+        end_of_day_local = datetime.combine(target_date, time.max, tzinfo=current_timezone)
+
         registros = RegistroPonto.objects.filter(
             funcionario=funcionario,
-            timestamp__date=target_date
+            timestamp__gte=start_of_day_local,
+            timestamp__lte=end_of_day_local
         ).order_by('timestamp')
+        
+
 
         if not registros.exists():
             # Lógica para falta injustificada
@@ -111,38 +118,25 @@ class Command(BaseCommand):
             return
 
         # 3. Calcular horas trabalhadas e pausas
-        entrada = registros.filter(tipo='ENTRADA').first()
-        saida = registros.filter(tipo='SAIDA').last()
+        jornada_bruta_minutos = self._calculate_paired_duration(registros, 'ENTRADA', 'SAIDA')
 
-        if not entrada or not saida:
-            self.stdout.write(f"  - [ERRO] Falta registro de ENTRADA ou SAIDA para {funcionario.nome_completo}.")
-            # Mesmo com erro, reseta o status para o dia seguinte
-            if funcionario.status_operacional != 'OFFLINE':
-                funcionario.status_operacional = 'OFFLINE'
-                funcionario.save(update_fields=['status_operacional'])
-                self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
-            return
-
-        jornada_bruta_minutos = (saida.timestamp - entrada.timestamp).total_seconds() / 60
-
-        # Calcular pausas
-        minutos_pausa = self.calculate_break_time(registros, 'SAIDA_PAUSA', 'VOLTA_PAUSA')
-        minutos_almoco = self.calculate_break_time(registros, 'SAIDA_ALMOCO', 'VOLTA_ALMOCO')
+        minutos_pausa = self._calculate_paired_duration(registros, 'SAIDA_PAUSA', 'VOLTA_PAUSA')
+        minutos_almoco = self._calculate_paired_duration(registros, 'SAIDA_ALMOCO', 'VOLTA_ALMOCO')
+        minutos_pausa_pessoal = self._calculate_paired_duration(registros, 'SAIDA_PAUSA_PESSOAL', 'VOLTA_PAUSA_PESSOAL')
         
-        jornada_liquida_minutos = jornada_bruta_minutos - minutos_pausa - minutos_almoco
+        jornada_liquida_minutos = jornada_bruta_minutos - minutos_pausa - minutos_almoco - minutos_pausa_pessoal
 
         # 4. Calcular carga horária esperada
-        entrada_esperada = datetime.combine(target_date, escala.horario_entrada)
-        saida_esperada = datetime.combine(target_date, escala.horario_saida)
+        entrada_esperada_obj = datetime.combine(target_date, escala.horario_entrada)
+        saida_esperada_obj = datetime.combine(target_date, escala.horario_saida)
         
-        if saida_esperada < entrada_esperada: # Turno noturno
-            saida_esperada += timedelta(days=1)
+        if saida_esperada_obj < entrada_esperada_obj: # Turno noturno
+            saida_esperada_obj += timedelta(days=1)
 
-        carga_horaria_bruta_esperada = (saida_esperada - entrada_esperada).total_seconds() / 60
+        carga_horaria_bruta_esperada = (saida_esperada_obj - entrada_esperada_obj).total_seconds() / 60
         
-        # FIX: Só desconta almoço se a jornada for longa
         almoco_a_descontar = 0
-        if carga_horaria_bruta_esperada > 300: # Limite de 5 horas
+        if carga_horaria_bruta_esperada > 300:
             almoco_a_descontar = escala.duracao_almoco_minutos
 
         carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - almoco_a_descontar
@@ -151,7 +145,10 @@ class Command(BaseCommand):
         diferenca_minutos = round(jornada_liquida_minutos - carga_horaria_liquida_esperada)
 
         if diferenca_minutos != 0:
-            descricao = self.get_description(diferenca_minutos, entrada, entrada_esperada.time())
+            primeira_entrada = registros.filter(tipo='ENTRADA').first()
+            descricao = "Ajuste"
+            if primeira_entrada:
+                 descricao = self.get_description(diferenca_minutos, primeira_entrada, escala.horario_entrada)
             
             BancoDeHoras.objects.update_or_create(
                 funcionario=funcionario,
@@ -161,34 +158,37 @@ class Command(BaseCommand):
             self.stdout.write(f"  - [OK] {funcionario.nome_completo}: {diferenca_minutos} min. ({descricao})")
         else:
             self.stdout.write(f"  - [OK] {funcionario.nome_completo}: Jornada cumprida.")
-
-        # Ao final do processamento do dia, garante que o status operacional volte a ser OFFLINE
+        
         if funcionario.status_operacional != 'OFFLINE':
             funcionario.status_operacional = 'OFFLINE'
             funcionario.save(update_fields=['status_operacional'])
             self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
 
-    def calculate_break_time(self, registros, tipo_saida, tipo_volta):
+    def _calculate_paired_duration(self, registros, tipo_saida, tipo_volta):
         saidas = list(registros.filter(tipo=tipo_saida))
         voltas = list(registros.filter(tipo=tipo_volta))
-        total_break_time = timedelta()
+        total_duration = timedelta()
 
         for s in saidas:
-            # Encontra a primeira volta correspondente após a saída
             corresponding_volta = next((v for v in voltas if v.timestamp > s.timestamp), None)
             if corresponding_volta:
-                total_break_time += corresponding_volta.timestamp - s.timestamp
-                voltas.remove(corresponding_volta) # Evita que a mesma volta seja usada duas vezes
+                total_duration += corresponding_volta.timestamp - s.timestamp
+                voltas.remove(corresponding_volta)
         
-        return total_break_time.total_seconds() / 60
+        return total_duration.total_seconds() / 60
 
     def get_description(self, diferenca_minutos, entrada_real_obj, entrada_esperada_time):
-        # Lógica simples para descrição
-        entrada_real_time = entrada_real_obj.timestamp.time()
+        local_timestamp = entrada_real_obj.timestamp.astimezone(timezone.get_current_timezone())
+        entrada_real_time = local_timestamp.time()
+        
         atraso_minutos = (datetime.combine(date.today(), entrada_real_time) - datetime.combine(date.today(), entrada_esperada_time)).total_seconds() / 60
 
-        if atraso_minutos > 5: # Tolerância de 5 minutos
-            return f"Atraso de {round(atraso_minutos)} min"
+        if atraso_minutos > 5:
+            atraso_arredondado = round(atraso_minutos)
+            # Verifica se o déficit é maior que apenas o atraso (indicando saída antecipada também)
+            if diferenca_minutos < 0 and (diferenca_minutos + atraso_arredondado) < -1:
+                 return f"Atraso ({atraso_arredondado} min) e Saída Antecipada"
+            return f"Atraso de {atraso_arredondado} min"
         
         if diferenca_minutos > 0:
             return "Horas extras"
