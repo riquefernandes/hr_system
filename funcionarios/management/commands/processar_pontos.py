@@ -141,6 +141,12 @@ class Command(BaseCommand):
         else:
             self.stdout.write(f"  - [OK] {funcionario.nome_completo}: Jornada cumprida.")
 
+        # Ao final do processamento do dia, garante que o status operacional volte a ser OFFLINE
+        if funcionario.status_operacional != 'OFFLINE':
+            funcionario.status_operacional = 'OFFLINE'
+            funcionario.save(update_fields=['status_operacional'])
+            self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
+
     def calculate_break_time(self, registros, tipo_saida, tipo_volta):
         saidas = list(registros.filter(tipo=tipo_saida))
         voltas = list(registros.filter(tipo=tipo_volta))
