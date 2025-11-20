@@ -279,18 +279,12 @@ def bate_ponto_view(request):
         )
         return redirect("funcionarios:home")
 
-    if tipo_ponto == "ENTRADA":
-        if funcionario.status_operacional != "OFFLINE":
-            messages.error(
-                request,
-                f"Ação inválida. Seu status atual é '{funcionario.get_status_operacional_display()}'.",
-            )
-            return redirect("funcionarios:home")
-
+    if tipo_ponto in ["ENTRADA", "SAIDA"]:
         data_local = timezone.localtime(agora).date()
         solicitacao_aprovada = SolicitacaoHorario.objects.filter(
             funcionario=funcionario, status="APROVADO", data_hora_ponto__date=data_local
         ).exists()
+
         if not solicitacao_aprovada:
             escala_atual = (
                 FuncionarioEscala.objects.filter(
@@ -300,16 +294,43 @@ def bate_ponto_view(request):
                 .first()
             )
             if not escala_atual:
-                messages.error(
-                    request, "Você não tem uma escala de trabalho definida. Contate o RH."
-                )
+                messages.error(request, "Você não tem uma escala de trabalho definida para hoje. Contate o RH.")
                 return redirect("funcionarios:home")
 
+            # Validação do dia da semana
             dia_da_semana = data_local.weekday()
             if str(dia_da_semana) not in escala_atual.escala.dias_semana.split(","):
                 messages.error(request, "Você não pode registrar o ponto em um dia de folga.")
                 return redirect("funcionarios:home")
 
+            # Validação do limite de horas extras
+            horario_inicio_jornada = escala_atual.escala.horario_entrada
+            horario_fim_jornada = escala_atual.escala.horario_saida
+
+            # Cria objetos datetime para comparação, lidando com fuso horário
+            current_timezone = timezone.get_current_timezone()
+            inicio_jornada_dt = datetime.combine(data_local, horario_inicio_jornada, tzinfo=current_timezone)
+            fim_jornada_dt = datetime.combine(data_local, horario_fim_jornada, tzinfo=current_timezone)
+            
+            # Lida com turnos que cruzam a meia-noite
+            if fim_jornada_dt < inicio_jornada_dt:
+                fim_jornada_dt += timedelta(days=1)
+
+            limite_inicio = inicio_jornada_dt - timedelta(hours=2)
+            limite_fim = fim_jornada_dt + timedelta(hours=2)
+
+            if not (limite_inicio <= agora <= limite_fim):
+                messages.error(request, "Você está tentando bater o ponto muito fora do seu horário. Por favor, solicite autorização.")
+                return redirect("funcionarios:solicitar_horario")
+
+    if tipo_ponto == "ENTRADA":
+        if funcionario.status_operacional != "OFFLINE":
+            messages.error(
+                request,
+                f"Ação inválida. Seu status atual é '{funcionario.get_status_operacional_display()}'.",
+            )
+            return redirect("funcionarios:home")
+        
     if tipo_ponto == "SAIDA_PAUSA":
         if funcionario.status_operacional != "DISPONIVEL":
             messages.error(
