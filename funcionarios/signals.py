@@ -30,20 +30,3 @@ def criar_user_para_funcionario(sender, instance, created, **kwargs):
         print(
             f"Usuário criado para {instance.nome_completo}. Matrícula: {matricula}, Senha: {senha}"
         )
-
-
-@receiver(user_logged_out)
-def on_user_logged_out(sender, request, user, **kwargs):
-    """
-    Quando um usuário desloga, verifica se a jornada está aberta,
-    cria um registro de SAIDA e marca seu status como Offline.
-    """
-    if hasattr(user, "funcionario"):
-        funcionario = user.funcionario
-        # Só executa a lógica se o funcionário não estiver já offline
-        if funcionario.status_operacional != "OFFLINE":
-            # Cria o registro de ponto para fechar o dia
-            RegistroPonto.objects.create(funcionario=funcionario, tipo="SAIDA")
-            # Atualiza o status
-            funcionario.status_operacional = "OFFLINE"
-            funcionario.save(update_fields=["status_operacional"])

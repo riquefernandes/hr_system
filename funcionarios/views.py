@@ -467,29 +467,21 @@ def tabela_equipe_view(request):
     user = request.user
     is_analista_rh = user.groups.filter(name='Analista de RH').exists()
 
-    print("\n--- [tabela_equipe_view] INICIANDO POLLING ---")
-
     if is_analista_rh:
         equipe = Funcionario.objects.filter(status='ATIVO')
-        print("Usuário é Analista de RH, buscando todos os funcionários ativos.")
     else:
-        supervisor = user.funcionario
+        supervisor = get_object_or_404(Funcionario, user=user)
         equipe = supervisor.equipe.all()
-        print(f"Usuário é Supervisor '{supervisor.nome_completo}', buscando sua equipe.")
         
     agora = timezone.now()
     inicio_do_dia = agora.replace(hour=0, minute=0, second=0, microsecond=0)
 
     for membro in equipe:
-        print(f"\n[Processando]: {membro.nome_completo} (ID: {membro.id})")
-        print(f"  -> Status atual no DB: '{membro.status_operacional}'")
-
+        # Sincroniza o status do funcionário com base no seu último registro de ponto do dia.
         ultimo_registro = RegistroPonto.objects.filter(
             funcionario=membro,
             timestamp__gte=inicio_do_dia
         ).order_by('-timestamp').first()
-        
-        print(f"  -> Último registro de ponto do dia: {ultimo_registro}")
 
         novo_status = 'OFFLINE'
         if ultimo_registro:
@@ -497,29 +489,19 @@ def tabela_equipe_view(request):
                 novo_status = 'DISPONIVEL'
             elif ultimo_registro.tipo in ['SAIDA_PAUSA', 'SAIDA_ALMOCO', 'SAIDA_PAUSA_PESSOAL']:
                 novo_status = 'EM_PAUSA'
-            elif ultimo_registro.tipo == 'SAIDA':
-                novo_status = 'OFFLINE'
+            # Se o tipo for 'SAIDA', o status permanece 'OFFLINE', que é o padrão.
         
-        print(f"  -> Status calculado: '{novo_status}'")
-
         if membro.status_operacional != novo_status:
-            print(f"  ==> DETECTADA DIVERGÊNCIA! Atualizando status de '{membro.status_operacional}' para '{novo_status}'.")
+            membro.status_operacional = novo_status
             Funcionario.objects.filter(pk=membro.pk).update(status_operacional=novo_status)
-            membro.status_operacional = novo_status 
-        else:
-            print("  --> Status no DB está correto. Nenhuma ação necessária.")
 
+        # Lógica para calcular tempo de pausa (permanece a mesma)
         membro.ultima_pausa = None
         membro.limite_pausa_segundos = 0
-
         if membro.status_operacional == "EM_PAUSA":
-            ultima_pausa_registro = (
-                RegistroPonto.objects.filter(
-                    funcionario=membro, tipo__in=["SAIDA_PAUSA", "SAIDA_ALMOCO"]
-                )
-                .order_by("-timestamp")
-                .first()
-            )
+            ultima_pausa_registro = RegistroPonto.objects.filter(
+                funcionario=membro, tipo__in=["SAIDA_PAUSA", "SAIDA_ALMOCO"]
+            ).order_by("-timestamp").first()
             membro.ultima_pausa = ultima_pausa_registro
 
             if ultima_pausa_registro and ultima_pausa_registro.tipo == "SAIDA_PAUSA":
@@ -533,7 +515,8 @@ def tabela_equipe_view(request):
                 ).first()
                 if regra_atual:
                     membro.limite_pausa_segundos = regra_atual.duracao_minutos * 60
-
+        
+        # Lógica da escala (permanece a mesma)
         membro.escala_atual = (
             FuncionarioEscala.objects.filter(
                 funcionario=membro, data_inicio__lte=agora.date()
@@ -541,8 +524,7 @@ def tabela_equipe_view(request):
             .filter(Q(data_fim__gte=agora.date()) | Q(data_fim__isnull=True))
             .first()
         )
-    
-    print("\n--- [tabela_equipe_view] FIM DO POLLING ---")
+
     return render(request, "funcionarios/_tabela_equipe.html", {"equipe": equipe})
 
 
