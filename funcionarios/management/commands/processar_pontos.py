@@ -83,32 +83,18 @@ class Command(BaseCommand):
 
 
         if not registros.exists():
-            # Lógica para falta injustificada
-            carga_horaria_bruta_esperada = (
-                datetime.combine(target_date, escala.horario_saida) - 
-                datetime.combine(target_date, escala.horario_entrada)
-            ).total_seconds() / 60
+            # Lógica para falta injustificada: Apenas registra a ocorrência, não debita do banco de horas.
+            self.stdout.write(f"  - [FALTA] Falta injustificada detectada para {funcionario.nome_completo}.")
             
-            if escala.horario_saida < escala.horario_entrada: # Turno noturno
-                carga_horaria_bruta_esperada += 24 * 60
+            # Limpa qualquer registro de BH que possa ter sido criado erroneamente em execuções anteriores
+            BancoDeHoras.objects.filter(funcionario=funcionario, data=target_date).delete()
 
-            # FIX: Só desconta almoço se a jornada for longa
-            almoco_a_descontar = 0
-            if carga_horaria_bruta_esperada > 300: # Limite de 5 horas
-                almoco_a_descontar = escala.duracao_almoco_minutos
-
-            carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - almoco_a_descontar
-            
-            # FIX: Debita o valor líquido, não o bruto
-            BancoDeHoras.objects.update_or_create(
-                funcionario=funcionario,
-                data=target_date,
-                defaults={
-                    'minutos': -carga_horaria_liquida_esperada,
-                    'descricao': 'Falta Injustificada'
-                }
-            )
-            self.stdout.write(f"  - [FALTA] Falta injustificada para {funcionario.nome_completo}.")
+            # Garante que o status operacional seja OFFLINE para o próximo dia
+            if funcionario.status_operacional != 'OFFLINE':
+                funcionario.status_operacional = 'OFFLINE'
+                funcionario.save(update_fields=['status_operacional'])
+                self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
+            return"  - [FALTA] Falta injustificada para {funcionario.nome_completo}.")
             
             # Ao final do processamento do dia, garante que o status operacional volte a ser OFFLINE
             if funcionario.status_operacional != 'OFFLINE':
