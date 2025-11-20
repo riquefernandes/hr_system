@@ -9,7 +9,7 @@ from django.db.models import Sum, Q
 
 # Importações para trabalhar com data e hora
 from django.utils import timezone
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, time
 from collections import defaultdict
 
 
@@ -533,27 +533,18 @@ def relatorio_folha_ponto(request):
     form = RelatorioFolhaPontoForm(user=request.user)
     relatorio_data = None
 
-    def _calculate_worked_hours(registros):
-        if not registros:
-            return 0
-        entrada = next((r for r in registros if r.tipo == 'ENTRADA'), None)
-        saida = next((r for r in reversed(registros) if r.tipo == 'SAIDA'), None)
-        if not entrada or not saida:
-            return 0
-        jornada_bruta_minutos = (saida.timestamp - entrada.timestamp).total_seconds() / 60
-        def _calculate_break_time(registros_break, tipo_saida, tipo_volta):
-            saidas = [r for r in registros_break if r.tipo == tipo_saida]
-            voltas = [r for r in registros_break if r.tipo == tipo_volta]
-            total_break_time = timedelta()
-            for s in saidas:
-                corresponding_volta = next((v for v in voltas if v.timestamp > s.timestamp), None)
-                if corresponding_volta:
-                    total_break_time += corresponding_volta.timestamp - s.timestamp
-                    voltas.remove(corresponding_volta)
-            return total_break_time.total_seconds() / 60
-        minutos_pausa = _calculate_break_time(registros, 'SAIDA_PAUSA', 'VOLTA_PAUSA')
-        minutos_almoco = _calculate_break_time(registros, 'SAIDA_ALMOCO', 'VOLTA_ALMOCO')
-        return jornada_bruta_minutos - minutos_pausa - minutos_almoco
+    def _calculate_paired_duration(registros, tipo_saida, tipo_volta):
+        saidas = list(r for r in registros if r.tipo == tipo_saida)
+        voltas = list(r for r in registros if r.tipo == tipo_volta)
+        total_duration = timedelta()
+
+        for s in saidas:
+            corresponding_volta = next((v for v in voltas if v.timestamp > s.timestamp), None)
+            if corresponding_volta:
+                total_duration += corresponding_volta.timestamp - s.timestamp
+                voltas.remove(corresponding_volta)
+        
+        return total_duration.total_seconds() / 60
 
     if request.method == "POST":
         form = RelatorioFolhaPontoForm(request.POST, user=request.user)
@@ -577,15 +568,17 @@ def relatorio_folha_ponto(request):
 
             if not pode_ver:
                 messages.error(request, "Você não tem permissão para visualizar o relatório deste funcionário.")
-                relatorio_data = None
-                return render(request, "funcionarios/relatorio_folha_ponto.html", {"form": form, "relatorio": relatorio_data})
+                return render(request, "funcionarios/relatorio_folha_ponto.html", {"form": form, "relatorio": None})
 
             funcionario = funcionario_selecionado
-            data_fim_ajustada = datetime.combine(data_fim, datetime.max.time())
+            current_timezone = timezone.get_current_timezone()
+            start_range_aware = datetime.combine(data_inicio, time.min, tzinfo=current_timezone)
+            end_range_aware = datetime.combine(data_fim, time.max, tzinfo=current_timezone)
+
             registros = (
                 RegistroPonto.objects.filter(
                     funcionario=funcionario,
-                    timestamp__range=(data_inicio, data_fim_ajustada),
+                    timestamp__range=(start_range_aware, end_range_aware),
                 )
                 .order_by("timestamp")
                 .select_related("funcionario")
@@ -593,10 +586,12 @@ def relatorio_folha_ponto(request):
             banco_horas = BancoDeHoras.objects.filter(
                 funcionario=funcionario, data__range=(data_inicio, data_fim)
             )
+            
             registros_por_dia = defaultdict(list)
             for registro in registros:
-                dia = registro.timestamp.date()
-                registros_por_dia[dia].append(registro)
+                dia_local = registro.timestamp.astimezone(current_timezone).date()
+                registros_por_dia[dia_local].append(registro)
+
             banco_por_dia = {bh.data: bh for bh in banco_horas}
             relatorio_data = []
             dias_no_periodo = (data_fim - data_inicio).days + 1
@@ -604,7 +599,13 @@ def relatorio_folha_ponto(request):
                 data_atual = data_inicio + timedelta(days=dia_offset)
                 saldo_bh = banco_por_dia.get(data_atual)
                 registros_do_dia = registros_por_dia.get(data_atual, [])
-                total_horas_trabalhadas_minutos = _calculate_worked_hours(registros_do_dia)
+                
+                jornada_bruta_minutos = _calculate_paired_duration(registros_do_dia, 'ENTRADA', 'SAIDA')
+                minutos_pausa = _calculate_paired_duration(registros_do_dia, 'SAIDA_PAUSA', 'VOLTA_PAUSA')
+                minutos_almoco = _calculate_paired_duration(registros_do_dia, 'SAIDA_ALMOCO', 'VOLTA_ALMOCO')
+                minutos_pausa_pessoal = _calculate_paired_duration(registros_do_dia, 'SAIDA_PAUSA_PESSOAL', 'VOLTA_PAUSA_PESSOAL')
+                total_horas_trabalhadas_minutos = jornada_bruta_minutos - minutos_pausa - minutos_almoco - minutos_pausa_pessoal
+
                 status_dia = ""
                 escala_info = (
                     FuncionarioEscala.objects.filter(
@@ -618,8 +619,13 @@ def relatorio_folha_ponto(request):
                     dia_da_semana = data_atual.weekday()
                     if str(dia_da_semana) in escala_info.escala.dias_semana.split(","):
                         is_workday = True
+
                 if is_workday and not registros_do_dia and not saldo_bh:
                     status_dia = "Falta Injustificada"
+                elif is_workday and not registros_do_dia and saldo_bh and saldo_bh.descricao == 'Falta Injustificada':
+                     status_dia = "Falta Injustificada"
+
+
                 relatorio_data.append(
                     {
                         "data": data_atual,

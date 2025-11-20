@@ -94,13 +94,6 @@ class Command(BaseCommand):
                 funcionario.status_operacional = 'OFFLINE'
                 funcionario.save(update_fields=['status_operacional'])
                 self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
-            return"  - [FALTA] Falta injustificada para {funcionario.nome_completo}.")
-            
-            # Ao final do processamento do dia, garante que o status operacional volte a ser OFFLINE
-            if funcionario.status_operacional != 'OFFLINE':
-                funcionario.status_operacional = 'OFFLINE'
-                funcionario.save(update_fields=['status_operacional'])
-                self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
             return
 
         # 3. Calcular horas trabalhadas e pausas
