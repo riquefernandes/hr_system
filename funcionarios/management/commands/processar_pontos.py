@@ -77,7 +77,6 @@ class Command(BaseCommand):
 
         if not registros.exists():
             # Lógica para falta injustificada
-            # Se for um dia de trabalho e não há registros, é uma falta.
             carga_horaria_bruta_esperada = (
                 datetime.combine(target_date, escala.horario_saida) - 
                 datetime.combine(target_date, escala.horario_entrada)
@@ -86,18 +85,29 @@ class Command(BaseCommand):
             if escala.horario_saida < escala.horario_entrada: # Turno noturno
                 carga_horaria_bruta_esperada += 24 * 60
 
-            carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - escala.duracao_almoco_minutos
+            # FIX: Só desconta almoço se a jornada for longa
+            almoco_a_descontar = 0
+            if carga_horaria_bruta_esperada > 300: # Limite de 5 horas
+                almoco_a_descontar = escala.duracao_almoco_minutos
+
+            carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - almoco_a_descontar
             
-            # Cria o registro negativo no banco de horas
+            # FIX: Debita o valor líquido, não o bruto
             BancoDeHoras.objects.update_or_create(
                 funcionario=funcionario,
                 data=target_date,
                 defaults={
-                    'minutos': -carga_horaria_bruta_esperada,
+                    'minutos': -carga_horaria_liquida_esperada,
                     'descricao': 'Falta Injustificada'
                 }
             )
             self.stdout.write(f"  - [FALTA] Falta injustificada para {funcionario.nome_completo}.")
+            
+            # Ao final do processamento do dia, garante que o status operacional volte a ser OFFLINE
+            if funcionario.status_operacional != 'OFFLINE':
+                funcionario.status_operacional = 'OFFLINE'
+                funcionario.save(update_fields=['status_operacional'])
+                self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
             return
 
         # 3. Calcular horas trabalhadas e pausas
@@ -106,6 +116,11 @@ class Command(BaseCommand):
 
         if not entrada or not saida:
             self.stdout.write(f"  - [ERRO] Falta registro de ENTRADA ou SAIDA para {funcionario.nome_completo}.")
+            # Mesmo com erro, reseta o status para o dia seguinte
+            if funcionario.status_operacional != 'OFFLINE':
+                funcionario.status_operacional = 'OFFLINE'
+                funcionario.save(update_fields=['status_operacional'])
+                self.stdout.write(f"  - [STATUS] Status operacional de {funcionario.nome_completo} definido para OFFLINE.")
             return
 
         jornada_bruta_minutos = (saida.timestamp - entrada.timestamp).total_seconds() / 60
@@ -124,7 +139,13 @@ class Command(BaseCommand):
             saida_esperada += timedelta(days=1)
 
         carga_horaria_bruta_esperada = (saida_esperada - entrada_esperada).total_seconds() / 60
-        carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - escala.duracao_almoco_minutos
+        
+        # FIX: Só desconta almoço se a jornada for longa
+        almoco_a_descontar = 0
+        if carga_horaria_bruta_esperada > 300: # Limite de 5 horas
+            almoco_a_descontar = escala.duracao_almoco_minutos
+
+        carga_horaria_liquida_esperada = carga_horaria_bruta_esperada - almoco_a_descontar
 
         # 5. Calcular diferença e criar registro no banco de horas
         diferenca_minutos = round(jornada_liquida_minutos - carga_horaria_liquida_esperada)
