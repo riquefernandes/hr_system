@@ -13,6 +13,7 @@ from .models import (
     FuncionarioEscala,
     BancoDeHoras,
     SolicitacaoHorario,
+    Feriado,
 )
 from django.utils import timezone
 
@@ -170,7 +171,9 @@ class EscalaAdmin(admin.ModelAdmin):
         "horario_saida",
         "dias_semana",
         "duracao_almoco_minutos",
+        "prioritaria",  # Adicionado aqui
     )
+    list_filter = ("prioritaria",)  # E aqui
     search_fields = ("nome",)
 
 
@@ -207,4 +210,11 @@ class SolicitacaoHorarioAdmin(admin.ModelAdmin):
         "data_analise",
         "data_solicitacao",
     )
+
+
+@admin.register(Feriado)
+class FeriadoAdmin(admin.ModelAdmin):
+    list_display = ("nome", "data", "recorrente")
+    list_filter = ("recorrente",)
+    search_fields = ("nome",)
 

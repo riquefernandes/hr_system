@@ -11,6 +11,8 @@ from django.db.models import Sum, Q
 from django.utils import timezone
 from datetime import timedelta, datetime, time
 from collections import defaultdict
+import calendar
+import holidays
 
 
 from .forms import (
@@ -31,6 +33,7 @@ from .models import (
     FuncionarioEscala,
     BancoDeHoras,
     SolicitacaoHorario,
+    Feriado,
 )
 
 
@@ -198,6 +201,8 @@ def meu_perfil_view(request):
 def minha_jornada_view(request):
     funcionario = request.user.funcionario
     agora = timezone.now()
+    year = agora.year
+    month = agora.month
 
     escala_atual = (
         FuncionarioEscala.objects.filter(
@@ -227,12 +232,59 @@ def minha_jornada_view(request):
     if escala_atual:
         dias_de_trabalho = formatar_dias_semana(escala_atual.escala.dias_semana)
 
+    # --- Lógica do Calendário ---
+    def gerar_dados_calendario(year, month, escala_info):
+        cal = calendar.Calendar()
+        br_holidays = holidays.country_holidays("BR")
+        dias_trabalho_escala = []
+        escala_prioritaria = False
+        if escala_info:
+            dias_trabalho_escala = [int(d) for d in escala_info.escala.dias_semana.split(',')]
+            escala_prioritaria = escala_info.escala.prioritaria
+
+        month_calendar = cal.monthdatescalendar(year, month)
+        calendar_data = []
+
+        for week in month_calendar:
+            week_data = []
+            for day_date in week:
+                status = "fora_mes"
+                if day_date.month == month:
+                    is_holiday = (day_date in br_holidays) or \
+                                 Feriado.objects.filter(data=day_date, recorrente=False).exists() or \
+                                 Feriado.objects.filter(data__day=day_date.day, data__month=day_date.month, recorrente=True).exists()
+
+                    is_workday = day_date.weekday() in dias_trabalho_escala
+
+                    if is_holiday:
+                        status = "feriado_trabalho" if escala_prioritaria else "feriado_folga"
+                    elif is_workday:
+                        status = "dia_trabalho"
+                    else:
+                        status = "dia_folga"
+                
+                week_data.append({
+                    "date": day_date,
+                    "day_num": day_date.day,
+                    "status": status,
+                    "is_today": day_date == agora.date()
+                })
+            calendar_data.append(week_data)
+        return calendar_data
+
+    # Nomes em português
+    meses_pt = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
+    dias_semana_pt = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+
     context = {
         "escala_atual": escala_atual,
         "dias_de_trabalho": dias_de_trabalho,
         "saldo_banco_horas": f"{saldo_horas}h {saldo_minutos_restantes}min",
         "saldo_banco_horas_negativo": saldo_total_minutos < 0,
         "funcionario_data": funcionario,
+        "calendario": gerar_dados_calendario(year, month, escala_atual),
+        "mes_atual_str": f"{meses_pt[month - 1]} {year}",
+        "dias_semana_headers": dias_semana_pt,
     }
     return render(request, "funcionarios/minha_jornada.html", context)
 
