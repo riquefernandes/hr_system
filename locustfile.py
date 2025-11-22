@@ -3,6 +3,7 @@ from locust import HttpUser, task, between
 
 
 class FuncionarioUser(HttpUser):
+    host = "http://web:8000"
     # Simula um usuário que espera entre 1 e 3 segundos entre cada ação
     wait_time = between(1, 3)
 
@@ -12,7 +13,7 @@ class FuncionarioUser(HttpUser):
         Vamos usá-la para fazer o login.
         """
         # --- ATENÇÃO: SUBSTITUA COM OS DADOS DO SEU USUÁRIO DE TESTE ---
-        matricula = "266230"
+        matricula = "265476"
         senha = "376895He@"
         # -----------------------------------------------------------
 
@@ -42,3 +43,4 @@ class FuncionarioUser(HttpUser):
         # Mesmo que o usuário não seja supervisor, podemos testar o acesso.
         # A view vai redirecioná-lo, o que também é uma carga para o servidor.
         self.client.get("/supervisor/dashboard/")
+
