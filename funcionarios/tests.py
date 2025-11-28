@@ -30,9 +30,33 @@ class PaginasDoSistemaTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse("funcionarios:login") + "?next=" + url)
 
-    def test_pagina_home_mostra_dados_do_usuario_logado(self):
+    def test_pagina_home_mostra_nome_do_usuario_logado(self):
         """
-        Verifica se, após o login, os dados do funcionário aparecem na página home.
+        Verifica se, após o login, o nome do funcionário aparece na página home.
+        """
+        # Preparação
+        usuario_teste = User.objects.create_user(username="269999", password="senha_super_secreta")
+        funcionario_teste = Funcionario.objects.create(
+            user=usuario_teste,
+            nome_completo="Nome Completo do Funcionário de Teste",
+            cpf="111.444.777-05",
+            data_nascimento="1990-01-01",
+            data_contratacao="2025-01-01",
+            deve_alterar_senha=False
+        )
+
+        # Ação
+        self.client.login(username="269999", password="senha_super_secreta")
+        url = reverse("funcionarios:home")
+        response = self.client.get(url)
+
+        # Verificação
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Nome Completo do Funcionário de Teste")
+
+    def test_pagina_meu_perfil_mostra_dados_do_usuario_logado(self):
+        """
+        Verifica se, após o login, os dados do funcionário aparecem na página Meu Perfil.
         """
         # PASSO 1: Preparação - Crie todos os dados necessários no BD de teste
         cargo_teste = Cargo.objects.create(nome="Cargo de Teste")
@@ -73,8 +97,8 @@ class PaginasDoSistemaTests(TestCase):
         # PASSO 2: Ação - Simule o login
         self.client.login(username="269999", password="senha_super_secreta")
 
-        # PASSO 3: Ação - Acesse a página home
-        url = reverse("funcionarios:home")
+        # PASSO 3: Ação - Acesse a página Meu Perfil
+        url = reverse("funcionarios:meu_perfil")
         response = self.client.get(url)
 
         # PASSO 4: Verificações (Asserts)
@@ -110,7 +134,7 @@ class RelatorioEquipeViewTests(TestCase):
             user=self.membro1_user,
             nome_completo="Membro Equipe 1",
             cpf="22222222222",
-            data_nascimento='1990-01-01',
+            data_nascimento='1900-01-01',
             data_contratacao='2021-01-01',
             supervisor=self.supervisor,
             deve_alterar_senha=False,
