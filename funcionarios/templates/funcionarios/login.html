@@ -1,34 +1,52 @@
-{% extends 'funcionarios/base.html' %}
-
-{% block title %}Login - Sistema RH{% endblock %}
-
-{% block content %}
+{% extends 'funcionarios/base.html' %} {% block title %}Login - Sistema RH{%
+endblock %} {% block content %}
 <div class="row justify-content-center mt-5">
     <div class="col-md-6 col-lg-5">
         <div class="card shadow">
             <div class="card-body p-4">
-                <h1 class="card-title text-center mb-4">Acesso do Funcionário</h1>
-                
-                {# Aqui é um bom lugar para exibir mensagens de erro no futuro, se o login falhar #}
-                
+                <h1 class="card-title text-center mb-4">
+                    Acesso do Funcionário
+                </h1>
+
+                {# Aqui é um bom lugar para exibir mensagens de erro no futuro,
+                se o login falhar #}
+
                 <form method="post" novalidate>
                     {% csrf_token %}
                     <div class="mb-3">
-                        <label for="username" class="form-label">Matrícula:</label>
-                        <input type="text" id="username" name="username" class="form-control" required>
+                        <label for="username" class="form-label"
+                            >Matrícula:</label
+                        >
+                        <input
+                            type="text"
+                            id="username"
+                            name="username"
+                            class="form-control"
+                            required
+                        />
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Senha:</label>
-                        <input type="password" id="password" name="password" class="form-control" required>
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="form-control"
+                            required
+                        />
                     </div>
                     <div class="d-grid mt-4">
-                        <button type="submit" class="btn btn-primary">Entrar</button>
+                        <button type="submit" class="btn btn-primary">
+                            Entrar
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
         <div class="text-center mt-3">
-            <a href="{% url 'admin:login' %}">É um administrador? Acesse aqui.</a>
+            <a href="{% url 'admin:login' %}"
+                >É um administrador? Acesse aqui.</a
+            >
         </div>
     </div>
 </div>

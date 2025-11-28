@@ -1,94 +1,158 @@
-{% extends 'funcionarios/base.html' %}
-{% block title %}Dashboard do Supervisor{% endblock %}
-{% block content %}
-    <h1 class="h2">Dashboard do Supervisor</h1>
-    <p class="lead">Bem-vindo, {{ supervisor.nome_completo }}.</p>
+{% extends 'funcionarios/base.html' %} {% block title %}Dashboard do
+Supervisor{% endblock %} {% block content %}
+<h1 class="h2">Dashboard do Supervisor</h1>
+<p class="lead">Bem-vindo, {{ supervisor.nome_completo }}.</p>
 
-    <div class="row">
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header fw-bold">Solicitações de Ponto Fora de Hora</div>
-                <div class="card-body">
-                    {% if solicitacoes_horario_pendentes %}
-                        <ul class="list-group">
-                            {% for solicitacao in solicitacoes_horario_pendentes %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <strong>{{ solicitacao.funcionario.nome_completo }}</strong> quer registrar ponto em {{ solicitacao.data_hora_ponto|date:"d/m/Y H:i" }}.
-                                        <p class="mb-0 text-muted small">Motivo: {{ solicitacao.motivo }}</p>
-                                    </div>
-                                    <div>
-                                        <a href="{% url 'funcionarios:aprovar_solicitacao_horario' solicitacao.id %}" class="btn btn-success btn-sm">Aprovar</a>
-                                        <a href="{% url 'funcionarios:recusar_solicitacao_horario' solicitacao.id %}" class="btn btn-danger btn-sm">Recusar</a>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-muted">Nenhuma solicitação pendente no momento.</p>
-                    {% endif %}
-                </div>
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header fw-bold">
+                Solicitações de Ponto Fora de Hora
             </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-header fw-bold">Solicitações de Abono</div>
-                <div class="card-body">
-                    {% if solicitacoes_abono_pendentes %}
-                        <ul class="list-group">
-                            {% for solicitacao in solicitacoes_abono_pendentes %}
-                                <li class="list-group-item">
-                                    <p><strong>{{ solicitacao.funcionario.nome_completo }}</strong> - {{ solicitacao.get_tipo_abono_display }}</p>
-                                    <p class="small mb-1">Período: {{ solicitacao.data_inicio|date:"d/m H:i" }} a {{ solicitacao.data_fim|date:"d/m H:i" }}</p>
-                                    <p class="text-muted small mb-2">Motivo: {{ solicitacao.motivo }}</p>
-                                    <div>
-                                        {% if solicitacao.documento %}
-                                            <a href="{{ solicitacao.documento.url }}" target="_blank" class="btn btn-secondary btn-sm">Ver Anexo</a>
-                                        {% endif %}
-                                        <a href="{% url 'funcionarios:aprovar_solicitacao_abono' solicitacao.id %}" class="btn btn-success btn-sm">Aprovar</a>
-                                        <a href="{% url 'funcionarios:recusar_solicitacao_abono' solicitacao.id %}" class="btn btn-danger btn-sm">Recusar</a>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="text-muted">Nenhuma solicitação pendente no momento.</p>
-                    {% endif %}
-                </div>
+            <div class="card-body">
+                {% if solicitacoes_horario_pendentes %}
+                <ul class="list-group">
+                    {% for solicitacao in solicitacoes_horario_pendentes %}
+                    <li
+                        class="list-group-item d-flex justify-content-between align-items-center"
+                    >
+                        <div>
+                            <strong
+                                >{{ solicitacao.funcionario.nome_completo
+                                }}</strong
+                            >
+                            quer registrar ponto em {{
+                            solicitacao.data_hora_ponto|date:"d/m/Y H:i" }}.
+                            <p class="mb-0 text-muted small">
+                                Motivo: {{ solicitacao.motivo }}
+                            </p>
+                        </div>
+                        <div>
+                            <a
+                                href="{% url 'funcionarios:aprovar_solicitacao_horario' solicitacao.id %}"
+                                class="btn btn-success btn-sm"
+                                >Aprovar</a
+                            >
+                            <a
+                                href="{% url 'funcionarios:recusar_solicitacao_horario' solicitacao.id %}"
+                                class="btn btn-danger btn-sm"
+                                >Recusar</a
+                            >
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">
+                    Nenhuma solicitação pendente no momento.
+                </p>
+                {% endif %}
             </div>
         </div>
     </div>
-
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body text-center">
-                    <a href="{% url 'funcionarios:relatorio_folha_ponto' %}" class="btn btn-outline-primary w-100">Relatório de Folha de Ponto</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-body text-center">
-                    <a href="{% url 'funcionarios:relatorio_equipe' %}" class="btn btn-primary w-100">Relatório de Gestão de Equipe</a>
-                </div>
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header fw-bold">Solicitações de Abono</div>
+            <div class="card-body">
+                {% if solicitacoes_abono_pendentes %}
+                <ul class="list-group">
+                    {% for solicitacao in solicitacoes_abono_pendentes %}
+                    <li class="list-group-item">
+                        <p>
+                            <strong
+                                >{{ solicitacao.funcionario.nome_completo
+                                }}</strong
+                            >
+                            - {{ solicitacao.get_tipo_abono_display }}
+                        </p>
+                        <p class="small mb-1">
+                            Período: {{ solicitacao.data_inicio|date:"d/m H:i"
+                            }} a {{ solicitacao.data_fim|date:"d/m H:i" }}
+                        </p>
+                        <p class="text-muted small mb-2">
+                            Motivo: {{ solicitacao.motivo }}
+                        </p>
+                        <div>
+                            {% if solicitacao.documento %}
+                            <a
+                                href="{{ solicitacao.documento.url }}"
+                                target="_blank"
+                                class="btn btn-secondary btn-sm"
+                                >Ver Anexo</a
+                            >
+                            {% endif %}
+                            <a
+                                href="{% url 'funcionarios:aprovar_solicitacao_abono' solicitacao.id %}"
+                                class="btn btn-success btn-sm"
+                                >Aprovar</a
+                            >
+                            <a
+                                href="{% url 'funcionarios:recusar_solicitacao_abono' solicitacao.id %}"
+                                class="btn btn-danger btn-sm"
+                                >Recusar</a
+                            >
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted">
+                    Nenhuma solicitação pendente no momento.
+                </p>
+                {% endif %}
             </div>
         </div>
     </div>
+</div>
 
-    <hr>
-    <h2 class="h4">Sua Equipe</h2>
-    <p>Abaixo estão os funcionários que estão sob sua supervisão direta. O status é atualizado a cada 15 segundos.</p>
-    <div class="card" hx-get="{% url 'funcionarios:tabela_equipe' %}" hx-trigger="load, every 15s" hx-swap="innerHTML">
-        <div class="card-body text-center"><p>Carregando dados da equipe...</p></div>
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <a
+                    href="{% url 'funcionarios:relatorio_folha_ponto' %}"
+                    class="btn btn-outline-primary w-100"
+                    >Relatório de Folha de Ponto</a
+                >
+            </div>
+        </div>
     </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-body text-center">
+                <a
+                    href="{% url 'funcionarios:relatorio_equipe' %}"
+                    class="btn btn-primary w-100"
+                    >Relatório de Gestão de Equipe</a
+                >
+            </div>
+        </div>
+    </div>
+</div>
+
+<hr />
+<h2 class="h4">Sua Equipe</h2>
+<p>
+    Abaixo estão os funcionários que estão sob sua supervisão direta. O status é
+    atualizado a cada 15 segundos.
+</p>
+<div
+    class="card"
+    hx-get="{% url 'funcionarios:tabela_equipe' %}"
+    hx-trigger="load, every 15s"
+    hx-swap="innerHTML"
+>
+    <div class="card-body text-center">
+        <p>Carregando dados da equipe...</p>
+    </div>
+</div>
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         // --- Lógica do Cronômetro de Pausa ---
         function updatePauseTimers() {
             const timerElements = document.querySelectorAll('.pause-timer');
-            
-            timerElements.forEach(timer => {
+
+            timerElements.forEach((timer) => {
                 if (!timer.dataset.pausestart) return;
 
                 const startTime = new Date(timer.dataset.pausestart);
@@ -120,11 +184,11 @@
         }
 
         // Inicia a atualização dos cronômetros
-        updatePauseTimers(); 
+        updatePauseTimers();
         setInterval(updatePauseTimers, 1000);
 
         // Garante que os cronômetros sejam atualizados após o HTMX carregar a tabela
-        document.body.addEventListener('htmx:afterSwap', function(event) {
+        document.body.addEventListener('htmx:afterSwap', function (event) {
             updatePauseTimers();
         });
     });

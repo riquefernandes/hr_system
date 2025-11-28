@@ -1,66 +1,107 @@
-{% extends 'funcionarios/base.html' %}
-
-{% block title %}Página Inicial - {{ funcionario_data.nome_completo }}{% endblock %}
-
-{% block content %}
+{% extends 'funcionarios/base.html' %} {% block title %}Página Inicial - {{
+funcionario_data.nome_completo }}{% endblock %} {% block content %}
 
 <div class="card mb-4">
-    <div class="card-header fw-bold">
-        Relógio de Ponto Virtual
-    </div>
+    <div class="card-header fw-bold">Relógio de Ponto Virtual</div>
     <div class="card-body text-center">
         {% if funcionario_data.status_operacional == 'OFFLINE' %}
-            <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
-                {% csrf_token %}
-                <input type="hidden" name="tipo_ponto" value="ENTRADA">
-                <button type="submit" class="btn btn-primary btn-lg">Registrar Entrada</button>
-            </form>
+        <form
+            action="{% url 'funcionarios:bate_ponto' %}"
+            method="post"
+            class="d-inline"
+        >
+            {% csrf_token %}
+            <input type="hidden" name="tipo_ponto" value="ENTRADA" />
+            <button type="submit" class="btn btn-primary btn-lg">
+                Registrar Entrada
+            </button>
+        </form>
         {% elif funcionario_data.status_operacional == 'DISPONIVEL' %}
-            <div class="btn-group" role="group" aria-label="Ações de Pausa">
-                {% if proxima_pausa_regra %}
-                    <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
-                        {% csrf_token %}
-                        <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA">
-                        <button type="submit" class="btn btn-info">
-                            Pausa Programada ({{ proxima_pausa_regra.nome }})
-                        </button>
-                    </form>
-                {% endif %}
-                                 <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA_PESSOAL">
-                                    <button type="submit" class="btn btn-secondary">Pausa Pessoal</button>
-                                </form>
-                            </div>
-                            <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="tipo_ponto" value="SAIDA">
-                                <button type="submit" class="btn btn-danger ms-3">Registrar Saída</button>
-                            </form>
-                        {% elif funcionario_data.status_operacional == 'EM_PAUSA' %}
-                            <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="tipo_ponto" value="VOLTA_PAUSA">
-                                <button type="submit" class="btn btn-success btn-lg">
-                                    Voltar da Pausa <span class="badge bg-light text-dark pause-timer" data-pausestart="{{ ultima_pausa.timestamp.isoformat }}"></span>
-                                </button>
-                            </form>
-                        {% endif %}        <hr>
+        <div class="btn-group" role="group" aria-label="Ações de Pausa">
+            {% if proxima_pausa_regra %}
+            <form
+                action="{% url 'funcionarios:bate_ponto' %}"
+                method="post"
+                class="d-inline"
+            >
+                {% csrf_token %}
+                <input type="hidden" name="tipo_ponto" value="SAIDA_PAUSA" />
+                <button type="submit" class="btn btn-info">
+                    Pausa Programada ({{ proxima_pausa_regra.nome }})
+                </button>
+            </form>
+            {% endif %}
+            <form
+                action="{% url 'funcionarios:bate_ponto' %}"
+                method="post"
+                class="d-inline"
+            >
+                {% csrf_token %}
+                <input
+                    type="hidden"
+                    name="tipo_ponto"
+                    value="SAIDA_PAUSA_PESSOAL"
+                />
+                <button type="submit" class="btn btn-secondary">
+                    Pausa Pessoal
+                </button>
+            </form>
+        </div>
+        <form
+            action="{% url 'funcionarios:bate_ponto' %}"
+            method="post"
+            class="d-inline"
+        >
+            {% csrf_token %}
+            <input type="hidden" name="tipo_ponto" value="SAIDA" />
+            <button type="submit" class="btn btn-danger ms-3">
+                Registrar Saída
+            </button>
+        </form>
+        {% elif funcionario_data.status_operacional == 'EM_PAUSA' %}
+        <form
+            action="{% url 'funcionarios:bate_ponto' %}"
+            method="post"
+            class="d-inline"
+        >
+            {% csrf_token %}
+            <input type="hidden" name="tipo_ponto" value="VOLTA_PAUSA" />
+            <button type="submit" class="btn btn-success btn-lg">
+                Voltar da Pausa
+                <span
+                    class="badge bg-light text-dark pause-timer"
+                    data-pausestart="{{ ultima_pausa.timestamp.isoformat }}"
+                ></span>
+            </button>
+        </form>
+        {% endif %}
+        <hr />
         <div class="mt-3">
             <p>
                 <strong>Status Operacional:</strong>
                 {% if funcionario_data.status_operacional == 'DISPONIVEL' %}
-                    <span class="badge bg-success">{{ funcionario_data.get_status_operacional_display }}</span>
+                <span class="badge bg-success"
+                    >{{ funcionario_data.get_status_operacional_display }}</span
+                >
                 {% elif funcionario_data.status_operacional == 'EM_PAUSA' %}
-                    <span class="badge bg-warning text-dark">{{ funcionario_data.get_status_operacional_display }}</span>
-                    {% if ultima_pausa %}
-                    <span class="text-muted small pause-timer" data-pausestart="{{ ultima_pausa.timestamp.isoformat }}"></span>
-                    {% endif %}
-                    {% if hora_fim_pausa %}
-                    <span id="break-countdown" class="badge bg-danger ms-2" data-break-end-time="{{ hora_fim_pausa }}"></span>
-                    {% endif %}
-                {% else %}
-                    <span class="badge bg-secondary">{{ funcionario_data.get_status_operacional_display }}</span>
+                <span class="badge bg-warning text-dark"
+                    >{{ funcionario_data.get_status_operacional_display }}</span
+                >
+                {% if ultima_pausa %}
+                <span
+                    class="text-muted small pause-timer"
+                    data-pausestart="{{ ultima_pausa.timestamp.isoformat }}"
+                ></span>
+                {% endif %} {% if hora_fim_pausa %}
+                <span
+                    id="break-countdown"
+                    class="badge bg-danger ms-2"
+                    data-break-end-time="{{ hora_fim_pausa }}"
+                ></span>
+                {% endif %} {% else %}
+                <span class="badge bg-secondary"
+                    >{{ funcionario_data.get_status_operacional_display }}</span
+                >
                 {% endif %}
             </p>
         </div>
@@ -74,14 +115,19 @@
                 </tr>
             </thead>
             <tbody>
-                {% for registro in funcionario_data.registros_ponto.all|slice:":5" %}
+                {% for registro in
+                funcionario_data.registros_ponto.all|slice:":5" %}
                 <tr>
                     <td>{{ registro.get_tipo_display }}</td>
-                    <td class="text-end">{{ registro.timestamp|date:"d/m/Y H:i:s" }}</td>
+                    <td class="text-end">
+                        {{ registro.timestamp|date:"d/m/Y H:i:s" }}
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="2" class="text-center">Nenhum registro hoje.</td>
+                    <td colspan="2" class="text-center">
+                        Nenhum registro hoje.
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -89,42 +135,63 @@
     </div>
 </div>
 
-{% if ultimo_ponto_entrada and funcionario_data.status_operacional != 'OFFLINE' %}
+{% if ultimo_ponto_entrada and funcionario_data.status_operacional != 'OFFLINE'
+%}
 <div class="card mb-4">
     <div class="card-body text-center">
         <h5 class="card-title">Tempo Logado Hoje</h5>
-        <p class="card-text fs-4 fw-bold" id="logged-in-timer" data-start-time="{{ ultimo_ponto_entrada.timestamp.isoformat }}"></p>
+        <p
+            class="card-text fs-4 fw-bold"
+            id="logged-in-timer"
+            data-start-time="{{ ultimo_ponto_entrada.timestamp.isoformat }}"
+        ></p>
     </div>
 </div>
 {% endif %}
 
 <!-- Modal Fim da Pausa -->
-<div class="modal fade" id="modalFimPausa" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1" aria-labelledby="modalFimPausaLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalFimPausaLabel">Pausa Finalizada</h5>
-      </div>
-      <div class="modal-body text-center">
-        <p>Seu tempo de pausa programada terminou.</p>
-        <p class="fs-3 fw-bold" id="modal-countdown"></p>
-        <p>Por favor, registre seu retorno.</p>
-      </div>
-      <div class="modal-footer justify-content-center">
-        <form action="{% url 'funcionarios:bate_ponto' %}" method="post" class="d-inline">
-            {% csrf_token %}
-            <input type="hidden" name="tipo_ponto" value="VOLTA_PAUSA">
-            <button type="submit" class="btn btn-success btn-lg">
-                Voltar da Pausa
-            </button>
-        </form>
-      </div>
+<div
+    class="modal fade"
+    id="modalFimPausa"
+    data-bs-backdrop="static"
+    data-bs-keyboard="false"
+    tabindex="-1"
+    aria-labelledby="modalFimPausaLabel"
+    aria-hidden="true"
+>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalFimPausaLabel">
+                    Pausa Finalizada
+                </h5>
+            </div>
+            <div class="modal-body text-center">
+                <p>Seu tempo de pausa programada terminou.</p>
+                <p class="fs-3 fw-bold" id="modal-countdown"></p>
+                <p>Por favor, registre seu retorno.</p>
+            </div>
+            <div class="modal-footer justify-content-center">
+                <form
+                    action="{% url 'funcionarios:bate_ponto' %}"
+                    method="post"
+                    class="d-inline"
+                >
+                    {% csrf_token %}
+                    <input
+                        type="hidden"
+                        name="tipo_ponto"
+                        value="VOLTA_PAUSA"
+                    />
+                    <button type="submit" class="btn btn-success btn-lg">
+                        Voltar da Pausa
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
-{% endblock content %}
-
-{% block extra_js %}
+{% endblock content %} {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // --- Lógica para pedir permissão de notificação ---
@@ -137,8 +204,8 @@
         // --- Lógica do Cronômetro de Pausa ---
         function updatePauseTimers() {
             const timerElements = document.querySelectorAll('.pause-timer');
-            
-            timerElements.forEach(timer => {
+
+            timerElements.forEach((timer) => {
                 if (!timer.dataset.pausestart) return;
                 const startTime = new Date(timer.dataset.pausestart);
                 const now = new Date();
@@ -149,7 +216,9 @@
                     return;
                 }
                 const hours = Math.floor(diff / (1000 * 60 * 60));
-                const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                const minutes = Math.floor(
+                    (diff % (1000 * 60 * 60)) / (1000 * 60),
+                );
                 const seconds = Math.floor((diff % (1000 * 60)) / 1000);
                 const pad = (num) => num.toString().padStart(2, '0');
                 timer.textContent = `(${pad(hours)}:${pad(minutes)}:${pad(seconds)})`;
@@ -175,17 +244,22 @@
             timerElement.textContent = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
         }
 
-        updatePauseTimers(); 
+        updatePauseTimers();
         updateLoggedInTimer();
         setInterval(updatePauseTimers, 1000);
         setInterval(updateLoggedInTimer, 1000);
 
         // --- Lógica do Countdown da Pausa Programada ---
         let notificationSent = false;
-        const notificationSound = new Audio('https://orangefreesounds.com/wp-content/uploads/2025/08/Notification-alert-sound-effect.mp3');
+        const notificationSound = new Audio(
+            'https://orangefreesounds.com/wp-content/uploads/2025/08/Notification-alert-sound-effect.mp3',
+        );
         const modalElement = document.getElementById('modalFimPausa');
-        const modalFimPausa = modalElement ? new bootstrap.Modal(modalElement) : null;
-        const modalCountdownElement = document.getElementById('modal-countdown');
+        const modalFimPausa = modalElement
+            ? new bootstrap.Modal(modalElement)
+            : null;
+        const modalCountdownElement =
+            document.getElementById('modal-countdown');
 
         function updateBreakCountdown() {
             const countdownElement = document.getElementById('break-countdown');
@@ -203,7 +277,9 @@
 
             if (isNaN(diff) || diff < 0) {
                 const timeOver = Math.abs(diff);
-                const minutesOver = Math.floor((timeOver % (1000 * 60 * 60)) / (1000 * 60));
+                const minutesOver = Math.floor(
+                    (timeOver % (1000 * 60 * 60)) / (1000 * 60),
+                );
                 const secondsOver = Math.floor((timeOver % (1000 * 60)) / 1000);
                 const timeOverText = `${pad(minutesOver)}:${pad(secondsOver)} excedido`;
                 countdownElement.textContent = 'Tempo Esgotado!';
@@ -217,7 +293,7 @@
                     if (Notification.permission === 'granted') {
                         new Notification('Fim da Pausa', {
                             body: 'Seu tempo de pausa programada terminou.',
-                            icon: '/static/admin/img/icon-clock.svg'
+                            icon: '/static/admin/img/icon-clock.svg',
                         });
                         notificationSound.play();
                     }
